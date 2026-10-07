@@ -53,14 +53,32 @@ minute dots.
 
 ## Getting started
 
-You need Python 3 and a USB-serial adapter for the first flash.
+You need Python 3.12, 3.13, or 3.14 and a USB-serial adapter for the first
+flash. ESPHome is pinned in `requirements.txt`; that release does not support
+Python 3.9 or Python 3.15.
+
+On macOS, install Python 3.12 with Homebrew if it is not already available:
+
+```bash
+brew install python@3.12
+```
+
+On Windows, install Python 3.12 from [python.org](https://www.python.org/downloads/).
+Create the environment with `py -3.12 -m venv .venv`, then activate it with
+`.venv\Scripts\activate` in Command Prompt or
+`.venv\Scripts\Activate.ps1` in PowerShell. Use the same pip and ESPHome
+commands below after activation.
+
+If you already have a `.venv` made with an unsupported Python version, deactivate
+it and remove that folder before recreating it.
 
 ```bash
 git clone https://github.com/SkyexTechnologies/word-clock.git
 cd word-clock
 
-python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 
 esphome config word-clock.yaml     # validate the configuration
@@ -76,6 +94,8 @@ esphome run word-clock.yaml --device /dev/cu.usbserial-XXXX
 
 After the first flash the clock appears on your network and later updates can
 go over WiFi (OTA): `esphome run word-clock.yaml --device <ip-or-hostname>`.
+The configuration enables native ESPHome OTA (`ota: - platform: esphome`);
+keep the clock and computer on the same network for wireless updates.
 
 ### First-time WiFi setup
 
@@ -96,6 +116,8 @@ for validation and autocomplete. Both work on the same files.
 word-clock/
 ├── word-clock.yaml    # the complete firmware configuration
 ├── requirements.txt   # pinned ESPHome version
+├── CLAUDE.md          # project context for Claude Code
+├── docs/              # design notes and shelved reference code
 ├── .gitignore
 └── README.md
 ```
@@ -114,14 +136,26 @@ specific letter-grid wiring; a different grid layout needs different indices.
 
 ## Notes
 
-- **Time zone:** the `sntp` time platform has no `timezone:` set, so ESPHome
-  infers it from the computer that compiles the firmware. Set `timezone:`
-  explicitly (for example `Europe/Amsterdam`) if the clock shows the wrong
-  hour.
-- **Networks without internet:** `sntp` uses the public NTP pool by default.
-  On a LAN with no internet, add a `servers:` list under the `sntp` platform
-  with the IP address of a local NTP server (router, NAS, ...).
-- **Pinned ESPHome version:** see `requirements.txt` before upgrading.
+- **Time zone:** the `sntp` time platform currently has no `timezone:` set,
+  so ESPHome infers it from the computer that compiles the firmware. If the
+  clock's time zone differs from the build computer, set an explicit IANA zone
+  such as `Europe/Amsterdam` in the `sntp` configuration.
+- **Networks without internet:** SNTP currently uses the public NTP pool by
+  default. To work on an internet-free LAN, configure an `sntp` server with the
+  IP address of a local NTP server. Use an IP rather than a hostname if the
+  network has no DNS. Some routers do not provide NTP; a NAS, Home Assistant
+  host, or router configured as an NTP server can provide it. There is no RTC,
+  so the clock needs an available NTP time source.
+- **LED layout:** the LED-to-word table is stored in a dedicated flash sector,
+  not compiled into the firmware. A new or unprovisioned clock stays dark until
+  its layout is written once. The custom 1 MB linker map keeps OTA writes away
+  from the layout and ESPHome-preferences sectors. After installing this
+  storage fix from older firmware, provision the layout again once.
+- **Pinned ESPHome and Python versions:** `requirements.txt` pins ESPHome.
+  Check the release's supported Python versions before upgrading; ESPHome
+  2026.9.1 requires Python 3.12-3.14.
+- **Design decisions:** see [docs/design-notes.md](docs/design-notes.md) for
+  the offline-time and per-device-layout design notes.
 
 ## Updating via ESPHome Dashboard
 
@@ -130,3 +164,25 @@ ESPHome Dashboard can be adopted straight from
 `github://SkyexTechnologies/word-clock/word-clock.yaml@main`. Keep
 `word-clock.yaml` at the repository root on the `main` branch, and bump
 `project_version` in the substitutions for every release.
+
+## Provisioning a word layout
+
+The firmware exposes the `set_word_layout` API service for factory setup. After
+the first flash and WiFi setup, connect the clock and provisioning computer to
+the same LAN, activate the project virtual environment, then run:
+
+```bash
+python scripts/provision_layout.py <clock-ip-or-hostname>
+```
+
+The default table is in `provisioning/default-layout.json`. The script validates
+37 rows of 12 LED indices and sends them over the encrypted/native ESPHome API
+when configured. The device log reports whether EEPROM commit succeeded. Keep
+the layout JSON with factory records; ordinary firmware updates must not call
+the provisioning service.
+
+The firmware reserves flash sector 250 for the layout and sector 251 for
+ESPHome preferences. Keep the `esp01_1m` board and the project linker script
+together; changing either can invalidate the storage map. The current firmware
+is close to the ESP8266's two-image OTA size limit, so check the OTA binary size
+when adding features.
