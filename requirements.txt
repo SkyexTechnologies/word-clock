@@ -1,0 +1,5 @@
+# Pinned so every build of the firmware uses the same ESPHome version.
+# ESPHome ships breaking changes between monthly releases, so bump this
+# deliberately: change the version, run `esphome config word-clock.yaml`,
+# then do a test build and flash before releasing.
+esphome==2026.9.1
