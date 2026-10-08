@@ -262,6 +262,10 @@ script:
             and: 
               - switch.is_on: automatic_brightness
               - light.is_on: word_clock
+              # The light sensor has no reading for up to 15 s after boot, but
+              # the brightness numbers already call this script when they
+              # restore. Skip until there is a reading instead of using NaN.
+              - lambda: return !std::isnan(id(light_sensor).state);
           then:
             - light.control:
                 id: word_clock
