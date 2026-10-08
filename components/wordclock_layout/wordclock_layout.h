@@ -37,7 +37,7 @@ class WordClockLayout : public Component {
               blob_.checksum == this->checksum_() && this->values_valid_();
 
     if (!loaded_) {
-      ESP_LOGE(TAG, "No valid word layout in flash - clock stays blank until provisioned");
+      ESP_LOGE(TAG, "No valid word layout in flash - running LED self-test until provisioned");
       memset(blob_.words, -1, sizeof(blob_.words));
     } else {
       ESP_LOGI(TAG, "Loaded word layout from flash (version %u)", blob_.version);

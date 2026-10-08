@@ -49,6 +49,7 @@ minute dots.
 | 09. Indication: Week Days | Show or hide the weekday letter |
 | 10. / 11. / 12. Red / Green / Blue | Colour channels (disabled by default) |
 | Restart / Factory Reset | Buttons |
+| Layout Provisioned | Diagnostic: on when a valid word layout is stored; off means no layout, and the clock runs its LED self-test until it is provisioned |
 
 ## Getting started
 
@@ -162,8 +163,9 @@ layout needs different indices.
   has no battery-backed RTC, so after a power loss it needs Home Assistant or
   an NTP server to recover the current time.
 - **LED layout:** the LED-to-word table is stored in a dedicated flash sector,
-  not compiled into the firmware. A new or unprovisioned clock stays dark until
-  its layout is written once. The custom 1 MB linker map keeps OTA writes away
+  not compiled into the firmware. A new or unprovisioned clock runs an LED
+  self-test (see [Provisioning a word layout](#provisioning-a-word-layout))
+  until its layout is written once. The custom 1 MB linker map keeps OTA writes away
   from the layout and ESPHome-preferences sectors. After installing this
   storage fix from older firmware, provision the layout again once.
 - **Pinned ESPHome and Python versions:** `requirements.txt` pins ESPHome.
@@ -182,6 +184,24 @@ ESPHome Dashboard can be adopted straight from
 
 ## Provisioning a word layout
 
+### LED self-test
+
+Until a layout is written, the clock runs an LED self-test instead of showing
+the time, so a new unit can be checked before provisioning. It needs no Wi-Fi
+or time and repeats continuously:
+
+1. All LEDs red, green, blue and white, one second each. Every LED should show
+   every colour; a dark LED or a missing colour points to a faulty LED or
+   solder joint.
+2. A single white LED steps from LED 0 to LED 120, 0.1 s each. It shows the
+   wiring order, and the log prints `[led_test] LED n` at each step, which helps
+   when creating a layout for a new letter grid.
+
+The light's brightness setting still applies. Once a layout is written, the
+clock switches to showing the time without a restart.
+
+### Writing the layout
+
 The firmware exposes the `set_word_layout` API service for factory setup. After
 the first flash and WiFi setup, connect the clock and provisioning computer to
 the same LAN, activate the project virtual environment, then run:
@@ -192,7 +212,8 @@ python scripts/provision_layout.py <clock-ip-or-hostname>
 
 The default table is in `provisioning/default-layout.json`. The script validates
 37 rows of 12 LED indices and sends them over the encrypted/native ESPHome API
-when configured. The device log reports whether EEPROM commit succeeded. Keep
+when configured. The device log reports whether EEPROM commit succeeded, and
+the `Layout Provisioned` diagnostic sensor turns on once it has. Keep
 the layout JSON with factory records; ordinary firmware updates must not call
 the provisioning service.
 
@@ -212,11 +233,37 @@ firmware, then uses the ESPHome-installed `esptool` to write only sector 250
 serial speed, or `--yes` to skip confirmation in a controlled factory process.
 Do not use `esptool erase-flash`: that erases the firmware and saved settings as
 well as the layout. After flashing, restart the clock and confirm the log says
-it loaded the layout. The USB tool is for the project's 1 MB `esp01_1m` flash
-map; use the API provisioner for other flash layouts.
+it loaded the layout, or that `Layout Provisioned` is on. The USB tool is for
+the project's 1 MB `esp01_1m` flash map; use the API provisioner for other
+flash layouts.
 
 The firmware reserves flash sector 250 for the layout and sector 251 for
 ESPHome preferences. Keep the `esp01_1m` board and the project linker script
 together; changing either can invalidate the storage map. Wireless updates
 need room for two firmware images in flash, so check the firmware size when
 adding features (see [design notes](docs/design-notes.md#guardrails)).
+
+### Removing the layout
+
+Erase the layout to rerun the [LED self-test](#led-self-test), to reuse a board
+behind a different letter grid, or to return a unit to its factory state. The
+layout cannot be removed over Wi-Fi, and the factory reset (button or
+`Factory Reset Word Clock`) keeps it on purpose: that reset only clears Wi-Fi
+and settings in sector 251.
+
+Connect the clock over USB (as for the USB layout writer above), then erase
+only the 4 KB layout sector:
+
+```bash
+source .venv/bin/activate
+python -m esptool --chip esp8266 --port /dev/cu.usbserial-XXXX erase-region 0xFA000 0x1000
+```
+
+Restart the clock. It starts the LED self-test, and `Layout Provisioned` is
+off. Firmware, Wi-Fi and settings are untouched. To put a layout back, use
+either method under [Writing the layout](#writing-the-layout).
+
+- Use exactly `0xFA000 0x1000`. Another address or length can erase the
+  firmware, the settings or the Wi-Fi calibration data.
+- Never use `esptool erase-flash`; it erases everything.
+- The address only applies to the project's 1 MB `esp01_1m` flash map.

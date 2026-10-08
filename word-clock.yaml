@@ -116,6 +116,14 @@ binary_sensor:
         max_length: 20s
         then:
           - button.press: factory_reset_button
+  # Off means the word layout in flash sector 250 is missing or corrupt, so
+  # the clock runs its LED self-test until it is provisioned (see README).
+  - platform: template
+    id: layout_provisioned
+    name: "Layout Provisioned"
+    entity_category: diagnostic
+    icon: "mdi:grid"
+    lambda: return id(layout).is_provisioned();
 
 select:
   - platform: template
@@ -524,7 +532,43 @@ light:
               fade = int(25*id(transition).state);
               fadeTransition = int(25*id(transition).state);
             }
-            
+
+            /*
+             * No valid word layout: run an LED self-test instead of the clock.
+             * An unprovisioned clock is then visibly different from a broken
+             * one, and every LED and colour channel can be checked before
+             * provisioning. Needs no layout, Wi-Fi or time.
+             * 1. All LEDs red, green, blue, white (1 s each).
+             * 2. One white LED steps from 0 to 120 (100 ms each), logging its index.
+             */
+            if (!id(layout).is_provisioned()) {
+              // 128 is about 14% PWM after gamma correction, which keeps the
+              // supply current low with all LEDs on.
+              static const uint8_t TEST_LEVEL = 128;
+              static const uint32_t COLOUR_MS = 1000;
+              static const uint32_t CHASE_MS = 100;
+              static int last_led = -1;
+              const Color colours[4] = {
+                  Color(TEST_LEVEL, 0, 0), Color(0, TEST_LEVEL, 0),
+                  Color(0, 0, TEST_LEVEL), Color(TEST_LEVEL, TEST_LEVEL, TEST_LEVEL)};
+
+              const uint32_t solid_ms = 4 * COLOUR_MS;
+              const uint32_t t = millis() % (solid_ms + it.size() * CHASE_MS);
+              if (t < solid_ms) {
+                it.all() = colours[t / COLOUR_MS];
+                last_led = -1;
+              } else {
+                const int led = (t - solid_ms) / CHASE_MS;
+                it.all() = Color::BLACK;
+                it[led] = Color::WHITE;
+                if (led != last_led) {
+                  ESP_LOGD("led_test", "LED %d", led);
+                  last_led = led;
+                }
+              }
+              return;
+            }
+
             auto time = id(sntp_time).now();
             if (!time.is_valid()) {
               return;
