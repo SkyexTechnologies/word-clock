@@ -121,7 +121,6 @@ word-clock/
 ├── docs/
 │   └── design-notes.md    # why the firmware is built this way
 ├── requirements.txt       # pinned ESPHome version
-├── TODO.md                # open work
 ├── CLAUDE.md              # project context for Claude Code
 ├── .gitignore
 └── README.md

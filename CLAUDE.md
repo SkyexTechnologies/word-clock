@@ -8,7 +8,8 @@ by customers, and no hard dependency on internet access.
 
 Hardware, settings and setup are in `README.md`; the reasoning behind the
 layout storage, time sources and publishing is in `docs/design-notes.md`;
-open work is in `TODO.md`.
+open work is tracked in GitHub Issues (`gh issue list`; `gh` is installed at
+`/opt/homebrew/bin`). Reference the issue number in commits that fix one.
 
 ## Repo layout
 
