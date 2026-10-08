@@ -124,6 +124,10 @@ select:
     restore_value: True
     optimistic: True
     icon: "mdi:map-clock"
+    # The selection is saved and applied by option index (see the switch in
+    # the apply_timezone script). Only append new zones at the end, and update
+    # apply_timezone to match; never insert, remove or reorder options, or
+    # customers' saved time zone changes after an update.
     options:
       - "Home Assistant / build default"
       - "UTC (UTC+00:00)"
@@ -185,6 +189,7 @@ script:
             esphome::time::set_global_tz(build_timezone);
             return;
           }
+          // Upper bound = last option index; raise it when appending a zone.
           if (timezone_index < 0 || timezone_index > 9) return;
 
           esphome::time::ParsedTimezone tz{};
