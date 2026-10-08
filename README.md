@@ -181,6 +181,25 @@ when configured. The device log reports whether EEPROM commit succeeded. Keep
 the layout JSON with factory records; ordinary firmware updates must not call
 the provisioning service.
 
+For factory setup without Wi-Fi, connect the USB-serial adapter and write the
+layout directly to the reserved flash sector instead:
+
+```bash
+python scripts/provision_layout_usb.py --port /dev/cu.usbserial-XXXX
+```
+
+Use 3.3 V UART levels; if the adapter has no automatic reset/bootloader
+circuit, enter ESP8266 bootloader mode (GPIO0 low while resetting). On Windows,
+pass the adapter's COM port (for example, `COM3`). The script asks for
+confirmation, builds the same versioned/checksummed layout blob used by the
+firmware, then uses the ESPHome-installed `esptool` to write only sector 250
+(`0xFA000`). Use `--layout` for another layout JSON, `--baud` to change the
+serial speed, or `--yes` to skip confirmation in a controlled factory process.
+Do not use `esptool erase-flash`: that erases the firmware and saved settings as
+well as the layout. After flashing, restart the clock and confirm the log says
+it loaded the layout. The USB tool is for the project's 1 MB `esp01_1m` flash
+map; use the API provisioner for other flash layouts.
+
 The firmware reserves flash sector 250 for the layout and sector 251 for
 ESPHome preferences. Keep the `esp01_1m` board and the project linker script
 together; changing either can invalidate the storage map. The current firmware

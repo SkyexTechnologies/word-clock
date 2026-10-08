@@ -89,6 +89,12 @@ the `set_word_layout` service over the ESPHome API. The script checks the
 row/entry counts and LED ranges before sending; the component checks them again
 before committing EEPROM. The layout is not part of normal OTA updates.
 
+For factory provisioning before Wi-Fi is available, `scripts/provision_layout_usb.py`
+encodes the same magic/version/word-table/checksum blob and uses esptool over
+USB serial to write physical flash offset `0xFA000` (sector 250). It writes a
+single 4 KB sector, not the firmware or ESPHome preferences. Keep this script's
+blob format and flash offset synchronized with the component and linker script.
+
 ### Guardrails
 
 - Keep `board: esp01_1m` and the 1 MB flash map. The custom linker script

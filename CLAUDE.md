@@ -17,6 +17,8 @@ by customers, and no hard dependency on internet access.
   store the per-device LED word table in dedicated flash sector 250.
 - `provisioning/default-layout.json` and `scripts/provision_layout.py` — default
   factory layout and one-time LAN provisioning client.
+- `scripts/provision_layout_usb.py` — one-time USB-serial writer for the
+  reserved layout sector, for factory setup before Wi-Fi is available.
 
 ## Commands (run from repo root, venv active)
 
@@ -71,8 +73,8 @@ folder via `config_dir` in its `settings.json`.
 1. `sntp` has no `timezone:`, so ESPHome infers it from the compiling machine.
    Wrong hours if that differs from the customer's zone.
 2. `sntp` uses the default public pool, so it never syncs on an offline LAN.
-3. Fresh devices need a one-time layout write using the `set_word_layout` API
-  service and the provisioning client.
+3. Fresh devices need a one-time layout write using either the `set_word_layout`
+  API service or the USB-serial sector writer.
 4. Confirm how customers actually receive updates (`dashboard_import` + local
    recompile, or a pre-built binary hosted on GitHub Pages with
    `ota: platform: http_request`). The layout design works with either.
