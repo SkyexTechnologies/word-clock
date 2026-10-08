@@ -141,42 +141,32 @@ select:
         - script.execute:
             id: apply_timezone
             timezone_index: !lambda return id(timezone).active_index().value_or(0);
+
+switch:
   - platform: template
-    name: "03. Brightness"
+    name: "03. Automatic Brightness"
     id: automatic_brightness
-    restore_value: True
     optimistic: True
+    restore_mode: RESTORE_DEFAULT_ON
     icon: "mdi:brightness-auto"
-    options:
-      - Automatic
-      - Manual
   - platform: template
-    name: "08 Indication: It is"
+    name: "07. Indication: It is"
     id: indication_it_is
-    restore_value: True
     optimistic: True
+    restore_mode: RESTORE_DEFAULT_ON
     icon: "mdi:file-word-box-outline"
-    options:
-      - "On"
-      - "Off"
   - platform: template
-    name: "09 Indication: Minutes"
+    name: "08. Indication: Minutes"
     id: indication_minutes
-    restore_value: True
     optimistic: True
+    restore_mode: RESTORE_DEFAULT_ON
     icon: "mdi:file-word-box-outline"
-    options:
-      - "On"
-      - "Off"
   - platform: template
-    name: "10 Indication: Week Days"
+    name: "09. Indication: Week Days"
     id: indication_week_days
-    restore_value: True
     optimistic: True
+    restore_mode: RESTORE_DEFAULT_ON
     icon: "mdi:file-word-box-outline"
-    options:
-      - "On"
-      - "Off"
 
 script:
   - id: apply_timezone
@@ -265,7 +255,7 @@ script:
       - if: 
           condition:
             and: 
-              - lambda: return id(automatic_brightness).index_of("Automatic") == id(automatic_brightness).active_index();
+              - switch.is_on: automatic_brightness
               - light.is_on: word_clock
           then:
             - light.control:
@@ -289,7 +279,7 @@ script:
 
 number:
   - platform: template
-    name: "11. Red"
+    name: "10. Red"
     id: red
     optimistic: True
     min_value: 0
@@ -310,7 +300,7 @@ number:
                   green: !lambda "return id(green).state;"
                   blue: !lambda "return id(blue).state;"
   - platform: template
-    name: "12. Green"
+    name: "11. Green"
     id: green
     optimistic: True
     min_value: 0
@@ -331,7 +321,7 @@ number:
                   green: !lambda "return x;"
                   blue: !lambda "return id(blue).state;"
   - platform: template
-    name: "13. Blue"
+    name: "12. Blue"
     id: blue
     optimistic: True
     min_value: 0
@@ -477,7 +467,7 @@ light:
         - if: 
             condition:
               and: 
-                - lambda: return id(automatic_brightness).index_of("Manual") == id(automatic_brightness).active_index();
+                - switch.is_off: automatic_brightness
                 - lambda: "return id(word_clock).remote_values.get_brightness() != id(brightness).state;"
                 - light.is_on: word_clock
             then:
@@ -489,7 +479,7 @@ light:
       then:
         - if:
             condition:
-              - lambda: return id(automatic_brightness).index_of("Manual") == id(automatic_brightness).active_index();
+              - switch.is_off: automatic_brightness
             then:
               - light.control: 
                   id: word_clock
@@ -559,9 +549,9 @@ light:
             if (PreviousTime[1] == CurrentTime[1]) {
               std::fill_n(letters, it.size(), Color::BLACK);
               for (int i = 0; i < 5; i++) { 
-                if (i == 0 && id(indication_it_is).index_of("Off") == id(indication_it_is).active_index()) continue;
-                if (i == 3 && id(indication_week_days).index_of("Off") == id(indication_week_days).active_index()) continue;
-                if (i == 4 && id(indication_minutes).index_of("Off") == id(indication_minutes).active_index()) continue;
+                if (i == 0 && !id(indication_it_is).state) continue;
+                if (i == 3 && !id(indication_week_days).state) continue;
+                if (i == 4 && !id(indication_minutes).state) continue;
                 for (int j = 0; j < 12; j++) {
                   int8_t led = id(layout).led_for(CurrentTime[i], j);
                   if (led >= 0) letters[led] = current_color;
