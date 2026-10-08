@@ -217,6 +217,6 @@ map; use the API provisioner for other flash layouts.
 
 The firmware reserves flash sector 250 for the layout and sector 251 for
 ESPHome preferences. Keep the `esp01_1m` board and the project linker script
-together; changing either can invalidate the storage map. The current firmware
-is close to the ESP8266's two-image OTA size limit, so check the OTA binary size
-when adding features.
+together; changing either can invalidate the storage map. Wireless updates
+need room for two firmware images in flash, so check the firmware size when
+adding features (see [design notes](docs/design-notes.md#guardrails)).

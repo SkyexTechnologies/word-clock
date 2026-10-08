@@ -64,8 +64,9 @@ works on macOS in VS Code with the ESPHome extension.
 ## Guardrails
 
 - Keep `board: esp01_1m` and the custom linker script in sync.
-- OTA headroom is only about 30 KB (image ~482 KB, max ~512 KB); check the
-  image size when adding features.
+- OTA size limit: the image (~485 KB) can grow to roughly 590 KB with
+  ESPHome's compressed native OTA, but only ~512 KB if an uncompressed `.bin`
+  is uploaded (web server OTA). Check the image size when adding features.
 - Keep the layout blob format and flash offset identical in the component and
   `scripts/provision_layout_usb.py`.
 - Recheck the `aioesphomeapi` calls in `scripts/provision_layout.py` when

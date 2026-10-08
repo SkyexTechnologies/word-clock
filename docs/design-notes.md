@@ -59,10 +59,13 @@ Ruled out:
   reserves sector 250 and ends OTA staging at `0x402FA000`.
 - Keep ESPHome preferences in sector 251; do not move `_SPIFFS_end` onto sector
   250 or restore the stock linker script.
-- OTA needs room for the running and the incoming image together within the
-  1,024,000 bytes below sector 250, so an image can be at most about 512 KB.
-  At 481,888 bytes there is only about 30 KB of headroom. Check the image size
-  on every release.
+- OTA needs room for the running image and the staged incoming image together
+  within the 1,024,000 bytes below sector 250. ESPHome's native OTA sends the
+  update gzip-compressed and stages it compressed (e.g. 485,088-byte image
+  staged as 345,392 bytes), so the image can grow to roughly 590 KB, depending
+  on how well it compresses. Uploading an uncompressed `.bin` (e.g. through
+  the web server OTA page) stages it uncompressed, which limits the image to
+  about 512 KB. Check the image size on every release.
 - Keep the blob format and flash offset identical in the component, the linker
   script and `scripts/provision_layout_usb.py`.
 - Keep the provisioning path separate from anything the update flow touches.
