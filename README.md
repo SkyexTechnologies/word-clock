@@ -26,8 +26,8 @@ minute dots.
 
 ## Features
 
-- Time from NTP (SNTP), shown in words to the nearest 5 minutes, plus four
-  minute dots (LEDs 117-120) for the minutes in between.
+- Time from Home Assistant or NTP (SNTP), shown in words to the nearest
+  5 minutes, plus four minute dots (LEDs 117-120) for the minutes in between.
 - Weekday letter (Z M D W D V Z, LEDs 110-116).
 - Automatic brightness from the light sensor, or manual brightness.
 - Smooth fade between times, adjustable from 0 to 10 seconds.
@@ -43,8 +43,7 @@ minute dots.
 | 02. Transition | Fade time between times, 0-10 s |
 | 03. Brightness | `Automatic` (light sensor) or `Manual` |
 | 04. / 05. Minimum / Maximum Brightness | Range used by automatic brightness |
-| 06. Hour Offset | Add 0-23 hours to the displayed time |
-| 07. Minutes Offset | Add 0-59 minutes to the displayed time |
+| 06. Time Zone | Follow Home Assistant/build default, or select a region with its UTC offset |
 | 08. Indication: It is | Show or hide "HET IS" |
 | 09. Indication: Minutes | Show or hide the four minute dots |
 | 10. Indication: Week Days | Show or hide the weekday letter |
@@ -136,16 +135,25 @@ specific letter-grid wiring; a different grid layout needs different indices.
 
 ## Notes
 
-- **Time zone:** the `sntp` time platform currently has no `timezone:` set,
-  so ESPHome infers it from the computer that compiles the firmware. If the
-  clock's time zone differs from the build computer, set an explicit IANA zone
-  such as `Europe/Amsterdam` in the `sntp` configuration.
-- **Networks without internet:** SNTP currently uses the public NTP pool by
-  default. To work on an internet-free LAN, configure an `sntp` server with the
-  IP address of a local NTP server. Use an IP rather than a hostname if the
-  network has no DNS. Some routers do not provide NTP; a NAS, Home Assistant
-  host, or router configured as an NTP server can provide it. There is no RTC,
-  so the clock needs an available NTP time source.
+- **Time source and time zone:** the firmware includes both Home Assistant
+  time and SNTP. Home Assistant sends time and its configured time zone over
+  the native API; no NTP service on the clock's LAN is needed when Home
+  Assistant is connected. The `06. Time Zone` selector follows Home Assistant
+  by default, or can choose one representative region for each supported
+  timezone: UTC (+00:00), Amsterdam (+01:00 / +02:00 DST), London (+00:00 /
+  +01:00 DST), New York (-05:00 / -04:00 DST), Chicago (-06:00 / -05:00 DST),
+  Denver (-07:00 / -06:00 DST), Los Angeles (-08:00 / -07:00 DST), Seoul,
+  South Korea (+09:00), or Sydney (+10:00 / +11:00 DST). The selection is saved across
+  restarts and includes daylight-saving rules for the listed regions. Home
+  Assistant 2026.3 or newer is required to send its timezone automatically;
+  older versions can use a manually selected region. In standalone use, the
+  default zone is inferred when the firmware is compiled; select a region in
+  the local web UI if needed. Embedded daylight-saving rules may need a
+  firmware update if regional laws change. SNTP uses the public pool by
+  default. For an internet-free LAN without Home Assistant, set SNTP to a
+  reachable local NTP server IP (use an IP if the LAN has no DNS). The ESP-12S
+  has no battery-backed RTC, so after a power loss it needs Home Assistant or
+  an NTP server to recover the current time.
 - **LED layout:** the LED-to-word table is stored in a dedicated flash sector,
   not compiled into the firmware. A new or unprovisioned clock stays dark until
   its layout is written once. The custom 1 MB linker map keeps OTA writes away

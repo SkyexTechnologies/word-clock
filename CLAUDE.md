@@ -45,8 +45,11 @@ folder via `config_dir` in its `settings.json`.
   weekday letters, 32-36 minute dots. `CurrentTime[5]` picks five rows per tick
   and the lambda fades between the old and new picture.
 - Settings are numbered entities (01-13), stored with `restore_value` and
-  `restore_from_flash: true`.
-- `time: sntp` has no `timezone:` and no `servers:` set (see Known gaps).
+  `restore_from_flash: true`; 06 is a persistent timezone selector, and the
+  former hour/minute offset controls were removed.
+- `time:` includes Home Assistant and SNTP sources. No explicit `timezone:` is
+  set, so Home Assistant supplies its timezone by default. A selected manual
+  region overrides it; standalone clocks default to the build-host timezone.
 - `dashboard_import` points at
   `github://SkyexTechnologies/word-clock/word-clock.yaml@main`, so
   `word-clock.yaml` must stay at the repo root on `main`. Bump
@@ -56,9 +59,10 @@ folder via `config_dir` in its `settings.json`.
 ## Decisions already made (do not relitigate without asking)
 
 - **No RTC chip.** Firmware-only solutions on the current hardware.
-- **Offline networks:** the target is a LAN with no internet but WITH a local
-  NTP server (router/NAS/Home Assistant). Fix is a `servers:` list on `sntp`
-  using a bare IP address, not a hostname (no DNS on isolated LANs).
+- **Offline networks:** the standard firmware includes Home Assistant time
+  over the native API and SNTP. Either Home Assistant or a local NTP server
+  can provide time on an internet-free LAN. Configure a bare IP for local
+  SNTP where DNS is unavailable.
 - **Per-device LED layout:** keep the word table in dedicated flash sector 250,
   separate from ESPHome preferences in sector 251. The custom linker script
   reserves sector 250 from OTA staging. See `docs/design-notes.md` and
@@ -70,9 +74,11 @@ folder via `config_dir` in its `settings.json`.
 
 ## Known gaps / open items
 
-1. `sntp` has no `timezone:`, so ESPHome infers it from the compiling machine.
-   Wrong hours if that differs from the customer's zone.
-2. `sntp` uses the default public pool, so it never syncs on an offline LAN.
+1. Runtime timezone selector supports UTC, Amsterdam, London, New York,
+  Chicago, Denver, Los Angeles, Seoul, and Sydney; add zones only with
+  verified daylight-saving rules.
+2. SNTP uses the default public pool, so it needs internet unless a local server
+  is configured. Home Assistant time covers clocks connected to HA.
 3. Fresh devices need a one-time layout write using either the `set_word_layout`
   API service or the USB-serial sector writer.
 4. Confirm how customers actually receive updates (`dashboard_import` + local

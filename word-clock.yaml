@@ -15,6 +15,9 @@ esphome:
     then:
       - light.turn_on:
           id: word_clock
+      - script.execute:
+          id: apply_timezone
+          timezone_index: !lambda return id(timezone).active_index().value_or(0);
 
 external_components:
   - source:
@@ -63,6 +66,23 @@ dashboard_import:
   import_full_config: False
 
 time:
+  # Home Assistant supplies both current time and its configured timezone over
+  # the native API. With no explicit timezone here, HA's timezone is applied
+  # dynamically when this source syncs.
+  - platform: homeassistant
+    id: homeassistant_time
+    on_time_sync:
+      then:
+        # A manually selected zone takes precedence over HA's automatic zone.
+        # Delay until the API handler has applied the timezone from HA.
+        - if:
+            condition:
+              lambda: return id(timezone).active_index().value_or(0) > 0;
+            then:
+              - delay: 1s
+              - script.execute:
+                  id: apply_timezone
+                  timezone_index: !lambda return id(timezone).active_index().value_or(0);
   - platform: sntp
     id: sntp_time
 
@@ -93,6 +113,29 @@ binary_sensor:
           - button.press: factory_reset_button
 
 select:
+  - platform: template
+    name: "06. Time Zone"
+    id: timezone
+    restore_value: True
+    optimistic: True
+    icon: "mdi:map-clock"
+    options:
+      - "Home Assistant / build default"
+      - "UTC (UTC+00:00)"
+      - "Amsterdam (UTC+01:00 / UTC+02:00 DST)"
+      - "London (UTC+00:00 / UTC+01:00 DST)"
+      - "New York (UTC-05:00 / UTC-04:00 DST)"
+      - "Chicago (UTC-06:00 / UTC-05:00 DST)"
+      - "Denver (UTC-07:00 / UTC-06:00 DST)"
+      - "Los Angeles (UTC-08:00 / UTC-07:00 DST)"
+      - "Seoul, South Korea (UTC+09:00)"
+      - "Sydney (UTC+10:00 / UTC+11:00 DST)"
+    initial_option: "Home Assistant / build default"
+    on_value:
+      then:
+        - script.execute:
+            id: apply_timezone
+            timezone_index: !lambda return id(timezone).active_index().value_or(0);
   - platform: template
     name: "03. Brightness"
     id: automatic_brightness
@@ -131,6 +174,85 @@ select:
       - "Off"
 
 script:
+  - id: apply_timezone
+    parameters:
+      timezone_index: int
+    then:
+      - lambda: |-
+          static esphome::time::ParsedTimezone build_timezone{};
+          static bool build_timezone_captured = false;
+          if (!build_timezone_captured) {
+            build_timezone = esphome::time::get_global_tz();
+            build_timezone_captured = true;
+          }
+
+          if (timezone_index == 0) {
+            esphome::time::set_global_tz(build_timezone);
+            return;
+          }
+          if (timezone_index < 0 || timezone_index > 9) return;
+
+          esphome::time::ParsedTimezone tz{};
+          auto set_dst_rule = [](esphome::time::DSTRule &rule, uint8_t month,
+                                 uint8_t week, int32_t time_seconds) {
+            rule.type = esphome::time::DSTRuleType::MONTH_WEEK_DAY;
+            rule.month = month;
+            rule.week = week;
+            rule.day_of_week = 0;  // Sunday
+            rule.time_seconds = time_seconds;
+          };
+
+          switch (timezone_index) {
+            case 1:  // UTC
+              break;
+            case 2:  // Europe/Amsterdam
+              tz.std_offset_seconds = -3600;
+              tz.dst_offset_seconds = -7200;
+              set_dst_rule(tz.dst_start, 3, 5, 7200);
+              set_dst_rule(tz.dst_end, 10, 5, 10800);
+              break;
+            case 3:  // Europe/London
+              tz.dst_offset_seconds = -3600;
+              set_dst_rule(tz.dst_start, 3, 5, 3600);
+              set_dst_rule(tz.dst_end, 10, 5, 7200);
+              break;
+            case 4:  // America/New_York
+              tz.std_offset_seconds = 18000;
+              tz.dst_offset_seconds = 14400;
+              set_dst_rule(tz.dst_start, 3, 2, 7200);
+              set_dst_rule(tz.dst_end, 11, 1, 7200);
+              break;
+            case 5:  // America/Chicago
+              tz.std_offset_seconds = 21600;
+              tz.dst_offset_seconds = 18000;
+              set_dst_rule(tz.dst_start, 3, 2, 7200);
+              set_dst_rule(tz.dst_end, 11, 1, 7200);
+              break;
+            case 6:  // America/Denver
+              tz.std_offset_seconds = 25200;
+              tz.dst_offset_seconds = 21600;
+              set_dst_rule(tz.dst_start, 3, 2, 7200);
+              set_dst_rule(tz.dst_end, 11, 1, 7200);
+              break;
+            case 7:  // America/Los_Angeles
+              tz.std_offset_seconds = 28800;
+              tz.dst_offset_seconds = 25200;
+              set_dst_rule(tz.dst_start, 3, 2, 7200);
+              set_dst_rule(tz.dst_end, 11, 1, 7200);
+              break;
+            case 8:  // Asia/Seoul
+              tz.std_offset_seconds = -32400;
+              break;
+            case 9:  // Australia/Sydney
+              tz.std_offset_seconds = -36000;
+              tz.dst_offset_seconds = -39600;
+              set_dst_rule(tz.dst_start, 10, 1, 7200);
+              set_dst_rule(tz.dst_end, 4, 1, 10800);
+              break;
+          }
+
+          esphome::time::set_global_tz(tz);
+
   - id: set_light_brightness
     parameters:
       quick_transition: bool
@@ -233,24 +355,6 @@ number:
     step: 1
     restore_value: True
     icon: "mdi:transition"
-  - platform: template
-    name: "06. Hour Offset"
-    id: hour_offset
-    optimistic: True
-    min_value: 0
-    max_value: 23
-    step: 1
-    restore_value: True
-    icon: "mdi:clock-plus-outline"
-  - platform: template
-    name: "07. Minutes Offset"
-    id: minutes_offset
-    optimistic: True
-    min_value: 0
-    max_value: 59
-    step: 1
-    restore_value: True
-    icon: "mdi:clock-plus-outline"
   - platform: template
     name: "04. Minimum Brightness"
     id: minimum_brightness
@@ -435,9 +539,9 @@ light:
               fadeTransition = trans;
             }
 
-            int total_minutes = (time.hour * 60 + time.minute + int(id(minutes_offset).state)) % 1440;
+            int total_minutes = time.hour * 60 + time.minute;
             minutes = (int)(total_minutes / 5) * 5 % 60; // minutes per 5
-            hours = (total_minutes / 60 + int(id(hour_offset).state)) % 24;
+            hours = total_minutes / 60;
 
             if (minutes >= 20) hours += 1;
 

@@ -111,38 +111,49 @@ blob format and flash offset synchronized with the component and linker script.
 
 ### Requirement
 
-After installation the clock must work on WiFi with no internet, as long as a
-local NTP server exists on that LAN. No RTC chip (ruled out).
+After installation the clock must work on WiFi with no internet, provided a
+local time source is available. A local NTP server or Home Assistant on the LAN
+can provide time. No RTC chip (ruled out).
 
 ### Facts
 
 - `sntp` accepts up to 3 servers, hostnames or IPs. Default is the public
   `0/1/2.pool.ntp.org`, which silently never syncs offline.
+- ESPHome's `homeassistant` time platform synchronizes over the native API, so
+  a clock connected to Home Assistant does not need to reach an NTP server.
+  When no explicit `timezone:` is configured, it also updates the clock's
+  timezone from Home Assistant at runtime.
+- The numbered `06. Time Zone` template select defaults to following Home
+  Assistant (or the build-host timezone when HA is absent). A manually chosen
+  region is persisted and reapplied after HA time syncs. Supported zones are
+  UTC (UTC+00:00), Amsterdam (UTC+01:00 / +02:00 DST), London (UTC+00:00 /
+  +01:00 DST), New York (UTC-05:00 / -04:00 DST), Chicago (UTC-06:00 /
+  -05:00 DST), Denver (UTC-07:00 / -06:00 DST), Los Angeles (UTC-08:00 /
+  -07:00 DST), Seoul (UTC+09:00), and Sydney (UTC+10:00 / +11:00 DST). These
+  are representative selections, not every IANA timezone. Hour
+  and minute display offsets were removed.
 - Use a bare IP, not a hostname. Isolated LANs may have no DNS, and ESPHome
   warns that manual IPs need `dns1`/`dns2` for hostnames.
 - `timezone:` accepts IANA names (`Europe/Amsterdam`) or POSIX strings. If
   omitted ESPHome infers it from the machine that compiles the firmware.
 
-### Recommended change (not in the current YAML)
+### Current configuration
 
 ```yaml
-substitutions:
-  ntp_server_1: "0.pool.ntp.org"
-  ntp_server_2: "1.pool.ntp.org"
-  ntp_server_3: "2.pool.ntp.org"
-  timezone: "Europe/Amsterdam"
-
 time:
+  - platform: homeassistant
+    id: homeassistant_time
   - platform: sntp
     id: sntp_time
-    timezone: ${timezone}
-    servers:
-      - ${ntp_server_1}
-      - ${ntp_server_2}
-      - ${ntp_server_3}
 ```
 
-Offline customers override `ntp_server_1` with their local NTP server's IP.
+Both sources are present in the one standard firmware. Home Assistant provides
+time and (unless a manual zone is selected) timezone when connected; SNTP
+provides time when an NTP server is reachable. Without Home Assistant, the
+timezone defaults to the build host's inferred timezone, and the selector lets
+the user choose a supported region. For isolated LANs without Home Assistant,
+configure SNTP with a local server IP. Without Home Assistant, NTP, or an RTC,
+correct time cannot be recovered after power loss.
 
 ### Caveat for customers
 
