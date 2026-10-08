@@ -41,13 +41,13 @@ minute dots.
 | --- | --- |
 | 01. Word Clock | The light itself (on/off, colour, brightness) |
 | 02. Transition | Fade time between times, 0-10 s |
-| 03. Brightness | `Automatic` (light sensor) or `Manual` |
+| 03. Automatic Brightness | On: follow the light sensor. Off: manual brightness |
 | 04. / 05. Minimum / Maximum Brightness | Range used by automatic brightness |
 | 06. Time Zone | Follow Home Assistant/build default, or select a region with its UTC offset |
-| 08. Indication: It is | Show or hide "HET IS" |
-| 09. Indication: Minutes | Show or hide the four minute dots |
-| 10. Indication: Week Days | Show or hide the weekday letter |
-| 11. / 12. / 13. Red / Green / Blue | Colour channels (disabled by default) |
+| 07. Indication: It is | Show or hide "HET IS" |
+| 08. Indication: Minutes | Show or hide the four minute dots |
+| 09. Indication: Week Days | Show or hide the weekday letter |
+| 10. / 11. / 12. Red / Green / Blue | Colour channels (disabled by default) |
 | Restart / Factory Reset | Buttons |
 
 ## Getting started
