@@ -7,6 +7,9 @@ substitutions:
 esphome:
   name: "${name}"
   name_add_mac_suffix: true
+  # Customers compile with their own dashboard's ESPHome version, which
+  # requirements.txt does not control. Keep this in sync with that pin.
+  min_version: 2026.9.1
   project:
     name: "${project_name}"
     version: "${project_version}"
@@ -20,9 +23,11 @@ esphome:
           timezone_index: !lambda return id(timezone).active_index().value_or(0);
 
 external_components:
-  - source:
-      type: local
-      path: components
+  # Fetched from GitHub (not a local path) so configs adopted through
+  # dashboard_import can find the component; a local path would resolve
+  # against the customer's config folder, which has no components/ directory.
+  - source: github://SkyexTechnologies/word-clock@main
+    components: [wordclock_layout]
 
 wordclock_layout:
   id: layout

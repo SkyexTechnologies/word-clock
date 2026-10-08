@@ -1,7 +1,8 @@
 # Design notes
 
-Decision records carried over from the planning conversation. Two topics:
-per-device LED layout storage, and offline (no internet) time.
+Decision records carried over from the planning conversation. Three topics:
+per-device LED layout storage, offline (no internet) time, and how firmware
+is published to customers.
 
 ## 1. Per-device LED layout storage
 
@@ -161,3 +162,47 @@ Many ISP routers do not serve NTP on the LAN. OPNsense, pfSense, UniFi, OpenWrt,
 or a NAS / Home Assistant box running chrony or ntpd usually do. Without one of
 those, the clock has no time source at all. A "last known time survives reboot"
 software clock was considered and not pursued.
+
+## 3. Publishing firmware to customers
+
+### Current setup
+
+This repository is public. Customers adopt a clock through `dashboard_import`
+(`github://SkyexTechnologies/word-clock/word-clock.yaml@main`), and the
+`wordclock_layout` component is loaded with
+`external_components: source: github://SkyexTechnologies/word-clock@main`.
+Both need anonymous HTTPS access, so a private repo breaks adoption and
+customer builds.
+
+A `type: local` component path does not work here: ESPHome resolves it
+against the customer's config folder (`CORE.relative_config_path`), which has
+no `components/` directory. Because the component is fetched from GitHub,
+local builds also use the pushed version (cached, refreshed daily), not
+uncommitted edits in `components/`.
+
+### Shelved: private repo with public release mirror (TODO)
+
+Goal: keep working history, factory scripts, provisioning data and design
+notes private, and ship customers only tagged releases instead of every push
+to `main`.
+
+Plan:
+
+- Make this repo private again. Create a public repo, e.g.
+  `SkyexTechnologies/word-clock-firmware`, holding only `word-clock.yaml`,
+  `components/` and a short customer README.
+- Add `.github/workflows/publish.yml` here, triggered by tags `v*`. It checks
+  that the tag matches `project_version`, compiles the firmware, clones the
+  public repo, replaces `word-clock.yaml` and `components/`, commits
+  "Release vX.Y.Z", tags it and pushes to a `release` branch.
+- Authenticate with an SSH deploy key that has write access to the public repo
+  only; store its private half as the Actions secret `PUBLIC_REPO_DEPLOY_KEY`.
+- Point `external_components` and `dashboard_import` at
+  `github://SkyexTechnologies/word-clock-firmware...@release`.
+- Add a `dev.yaml` that uses the local `components/` folder, so component
+  changes can be built and tested (locally and in CI) before publishing.
+- Optional extension: the same workflow attaches the compiled `.bin` to a
+  GitHub Release or GitHub Pages for `ota: platform: http_request`
+  (see open item 4 in `CLAUDE.md`).
+
+The repo and deploy key must be created by the owner.
