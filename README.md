@@ -113,10 +113,16 @@ for validation and autocomplete. Both work on the same files.
 
 ```
 word-clock/
-├── word-clock.yaml    # the complete firmware configuration
-├── requirements.txt   # pinned ESPHome version
-├── CLAUDE.md          # project context for Claude Code
-├── docs/              # design notes and shelved reference code
+├── word-clock.yaml        # the complete firmware configuration
+├── components/
+│   └── wordclock_layout/  # layout storage component and linker script
+├── provisioning/          # default factory LED layout (JSON)
+├── scripts/               # one-time layout writers (LAN and USB serial)
+├── docs/
+│   └── design-notes.md    # why the firmware is built this way
+├── requirements.txt       # pinned ESPHome version
+├── TODO.md                # open work
+├── CLAUDE.md              # project context for Claude Code
 ├── .gitignore
 └── README.md
 ```
@@ -126,12 +132,14 @@ ignored by git.
 
 ## How the time is shown
 
-The `Clock` effect in `word-clock.yaml` holds a table of LED indices for every
-word (`words[37][12]`, `-1` marks an unused slot). Each tick it builds up to
-five entries from the current time: "HET IS", the minute phrase, the hour, the
-weekday letter and the minute dots. It then lights the LEDs listed for those
-entries and fades between the old and new picture. The table matches one
-specific letter-grid wiring; a different grid layout needs different indices.
+Each clock stores a table of LED indices for every word (37 rows of 12
+entries, `-1` marks an unused slot) in its own flash; see
+[Provisioning a word layout](#provisioning-a-word-layout). Each tick, the
+`Clock` effect in `word-clock.yaml` picks up to five rows for the current time:
+"HET IS", the minute phrase, the hour, the weekday letter and the minute dots.
+It then lights the LEDs listed for those rows and fades between the old and new
+picture. The table matches one specific letter-grid wiring; a different grid
+layout needs different indices.
 
 ## Notes
 

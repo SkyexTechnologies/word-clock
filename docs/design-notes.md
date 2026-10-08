@@ -1,144 +1,83 @@
 # Design notes
 
-Decision records carried over from the planning conversation. Three topics:
-per-device LED layout storage, offline (no internet) time, and how firmware
-is published to customers.
+Why the firmware is built the way it is. Three topics: per-device LED layout
+storage, offline (no internet) time, and how firmware is published to
+customers. For setup and usage, see the [README](../README.md).
 
 ## 1. Per-device LED layout storage
 
 ### Problem
 
-Every physical clock can have its own LED-index-to-word wiring (the
-`words[][12]` table). Customers update firmware themselves from one shared,
-centrally maintained config, so the per-unit table must not be part of the
-compiled firmware. Every customer should run the same binary, and an update
-must never need per-device data.
+Every physical clock can have its own LED-index-to-word wiring. Customers
+update firmware themselves from one shared, centrally maintained config, so
+the per-unit table must not be part of the compiled firmware. Every customer
+runs the same binary, and an update must never need per-device data.
 
-### Decision (implemented in `word-clock.yaml`)
+### Decision
 
 Store the table in dedicated flash sector 250 (`0x402FA000`) on the 1 MB
 `esp01_1m` layout. ESPHome preferences use sector 251 (`0x402FB000`). A custom
 linker script moves the OTA staging boundary down by one sector, keeping OTA
-writes below the layout sector. A small custom ESPHome component loads the
-table once at boot. The effect lambda then reads it from RAM.
+writes below the layout sector. The `wordclock_layout` component loads the
+table once at boot, and the Clock effect reads it from RAM.
 
 Ruled out:
 
 - `globals: restore_value: true`: the ESP8266 flash-preferences pool is shared
-  by all components and holds about 96 bytes in total. The table is 384-444
-  bytes. There are also open ESPHome issues about flash preferences being
-  disturbed by OTA on ESP8266.
+  by all components and holds about 96 bytes in total; the table is 444 bytes.
+  There are also open ESPHome issues about flash preferences being disturbed by
+  OTA on ESP8266.
 - One compiled binary per customer (packages/substitutions): ESPHome's usual
   advice for sellers, but it does not fit self-service updates from one shared
   build.
 
 ### How it works
 
-- Storage format (about 450 bytes, `EEPROMClass(250)` with a 512-byte buffer): `uint32 magic`
-  ("WLK1"), `uint8 version`, `int8_t words[NUM_WORDS][12]`, `uint8 checksum`.
-  Every value fits in `int8_t`, including the `-1` sentinel.
-- `setup()` reads the blob. If magic, version or checksum is wrong (blank or
-  corrupt unit) it logs an error and fills the table with `-1`, so the clock
-  stays dark instead of lighting random LEDs.
-- `led_for(word, slot)` replaces `words[word][slot]` in the effect lambda:
-
-  ```cpp
-  int8_t led = id(layout).led_for(CurrentTime[i], j);
-  if (led >= 0) letters[led] = current_color;
-  ```
-
-- Writing happens only at provisioning time. An `api: services:` entry
-  `set_word_layout` takes an `int[]` (rows x 12, row-major) and calls
-  `write_layout_flat()`. A bench script using `aioesphomeapi` flattens the
-  unit's table and calls the service once over the LAN after the first boot.
-  Customer OTA updates never call it. After migrating from the old shared
-  sector, provision the table once again; subsequent OTA updates preserve it.
-- Wiring in YAML:
-
-  ```yaml
-  external_components:
-    - source:
-        type: local
-        path: components
-  wordclock_layout:
-    id: layout
-  api:
-    services:
-      - service: set_word_layout
-        variables:
-          flat_layout: int[]
-        then:
-          - lambda: |-
-              id(layout).write_layout_flat(flat_layout);
-  ```
-
+- Storage format (450 bytes, `EEPROMClass(250)` with a 512-byte buffer):
+  `uint32 magic` ("WLK1"), `uint8 version`, `int8_t words[37][12]`,
+  `uint8 checksum`. Every value fits in `int8_t`, including the `-1` sentinel.
+- `setup()` reads the blob. If magic, version, checksum or any LED index is
+  wrong (blank or corrupt unit), it logs an error and keeps the table at `-1`,
+  so the clock stays dark instead of lighting random LEDs.
+- The effect lambda calls `id(layout).led_for(row, slot)`; `-1` means unused.
 - `on_boot` priority -10 runs after component `setup()`, so the table is
   loaded before the Clock effect starts.
-
-### Reference code
-
-`components/wordclock_layout/` is the live component. It uses 37 rows of 12
-entries and validates each LED index (`-1` or `0..120`) before writing. The
-original reference implementation remains under
-`docs/layout-storage-reference/`. Changing the table shape means bumping
-`CONFIG_VERSION` and re-provisioning units.
-
-The current factory map is in `provisioning/default-layout.json`. After first
-boot (and once after migrating from the previous shared-sector firmware), run
-`python scripts/provision_layout.py <clock-ip-or-hostname>` to call
-the `set_word_layout` service over the ESPHome API. The script checks the
-row/entry counts and LED ranges before sending; the component checks them again
-before committing EEPROM. The layout is not part of normal OTA updates.
-
-For factory provisioning before Wi-Fi is available, `scripts/provision_layout_usb.py`
-encodes the same magic/version/word-table/checksum blob and uses esptool over
-USB serial to write physical flash offset `0xFA000` (sector 250). It writes a
-single 4 KB sector, not the firmware or ESPHome preferences. Keep this script's
-blob format and flash offset synchronized with the component and linker script.
+- Writing happens only at provisioning time, never during updates:
+  - **Over the LAN:** the `set_word_layout` API service takes an `int[]`
+    (37 x 12, row-major) and calls `write_layout_flat()`, which validates and
+    commits it. `scripts/provision_layout.py` sends
+    `provisioning/default-layout.json` (or another file) to it.
+  - **Over USB serial:** `scripts/provision_layout_usb.py` builds the same blob
+    and writes only sector 250 (physical offset `0xFA000`) with esptool, for
+    factory setup before Wi-Fi is available.
+- Changing the table shape means bumping `CONFIG_VERSION` and re-provisioning
+  every unit.
 
 ### Guardrails
 
 - Keep `board: esp01_1m` and the 1 MB flash map. The custom linker script
-  reserves sector 250 and limits OTA staging to end at `0x402FA000`.
-- The current OTA image is about 479 KB; the two-image OTA limit is about
-  500 KB, leaving roughly 64 KB of headroom. Check image size on every release.
+  reserves sector 250 and ends OTA staging at `0x402FA000`.
 - Keep ESPHome preferences in sector 251; do not move `_SPIFFS_end` onto sector
   250 or restore the stock linker script.
+- OTA needs room for the running and the incoming image together within the
+  1,024,000 bytes below sector 250, so an image can be at most about 512 KB.
+  At 481,888 bytes there is only about 30 KB of headroom. Check the image size
+  on every release.
+- Keep the blob format and flash offset identical in the component, the linker
+  script and `scripts/provision_layout_usb.py`.
 - Keep the provisioning path separate from anything the update flow touches.
-- Check the `aioesphomeapi` method names against the pinned version before
-  writing the bench script (`list_entities_services`, `execute_service`).
 
 ## 2. Offline / no-internet time
 
 ### Requirement
 
-After installation the clock must work on WiFi with no internet, provided a
-local time source is available. A local NTP server or Home Assistant on the LAN
-can provide time. No RTC chip (ruled out).
+After installation the clock must work on Wi-Fi with no internet, provided a
+local time source is available: Home Assistant or a local NTP server. No RTC
+chip (ruled out).
 
-### Facts
+### Decision
 
-- `sntp` accepts up to 3 servers, hostnames or IPs. Default is the public
-  `0/1/2.pool.ntp.org`, which silently never syncs offline.
-- ESPHome's `homeassistant` time platform synchronizes over the native API, so
-  a clock connected to Home Assistant does not need to reach an NTP server.
-  When no explicit `timezone:` is configured, it also updates the clock's
-  timezone from Home Assistant at runtime.
-- The numbered `06. Time Zone` template select defaults to following Home
-  Assistant (or the build-host timezone when HA is absent). A manually chosen
-  region is persisted and reapplied after HA time syncs. Supported zones are
-  UTC (UTC+00:00), Amsterdam (UTC+01:00 / +02:00 DST), London (UTC+00:00 /
-  +01:00 DST), New York (UTC-05:00 / -04:00 DST), Chicago (UTC-06:00 /
-  -05:00 DST), Denver (UTC-07:00 / -06:00 DST), Los Angeles (UTC-08:00 /
-  -07:00 DST), Seoul (UTC+09:00), and Sydney (UTC+10:00 / +11:00 DST). These
-  are representative selections, not every IANA timezone. Hour
-  and minute display offsets were removed.
-- Use a bare IP, not a hostname. Isolated LANs may have no DNS, and ESPHome
-  warns that manual IPs need `dns1`/`dns2` for hostnames.
-- `timezone:` accepts IANA names (`Europe/Amsterdam`) or POSIX strings. If
-  omitted ESPHome infers it from the machine that compiles the firmware.
-
-### Current configuration
+The one standard firmware includes both sources:
 
 ```yaml
 time:
@@ -148,20 +87,24 @@ time:
     id: sntp_time
 ```
 
-Both sources are present in the one standard firmware. Home Assistant provides
-time and (unless a manual zone is selected) timezone when connected; SNTP
-provides time when an NTP server is reachable. Without Home Assistant, the
-timezone defaults to the build host's inferred timezone, and the selector lets
-the user choose a supported region. For isolated LANs without Home Assistant,
-configure SNTP with a local server IP. Without Home Assistant, NTP, or an RTC,
-correct time cannot be recovered after power loss.
+- ESPHome's `homeassistant` time platform synchronizes over the native API, so
+  a clock connected to Home Assistant needs no NTP server. With no explicit
+  `timezone:`, it also takes Home Assistant's timezone at runtime.
+- `sntp` defaults to the public `0/1/2.pool.ntp.org`, which silently never
+  syncs offline. It accepts up to 3 servers; on an isolated LAN use a bare IP,
+  because there may be no DNS.
+- Without Home Assistant, the timezone defaults to the one inferred from the
+  machine that compiled the firmware. The `06. Time Zone` select lets users
+  pick a supported region instead (list in the README). It stores the option
+  index and is reapplied after each Home Assistant time sync. Display hour and
+  minute offsets were removed in favour of real timezones.
 
 ### Caveat for customers
 
 Many ISP routers do not serve NTP on the LAN. OPNsense, pfSense, UniFi, OpenWrt,
 or a NAS / Home Assistant box running chrony or ntpd usually do. Without one of
-those, the clock has no time source at all. A "last known time survives reboot"
-software clock was considered and not pursued.
+those, the clock has no time source after a power loss. A "last known time
+survives reboot" software clock was considered and not pursued.
 
 ## 3. Publishing firmware to customers
 
@@ -180,7 +123,10 @@ no `components/` directory. Because the component is fetched from GitHub,
 local builds also use the pushed version (cached, refreshed daily), not
 uncommitted edits in `components/`.
 
-### Shelved: private repo with public release mirror (TODO)
+`esphome: min_version` matches the pin in `requirements.txt`, so customer
+dashboards running an older ESPHome fail with a clear message.
+
+### Shelved: private repo with public release mirror
 
 Goal: keep working history, factory scripts, provisioning data and design
 notes private, and ship customers only tagged releases instead of every push
@@ -202,7 +148,6 @@ Plan:
 - Add a `dev.yaml` that uses the local `components/` folder, so component
   changes can be built and tested (locally and in CI) before publishing.
 - Optional extension: the same workflow attaches the compiled `.bin` to a
-  GitHub Release or GitHub Pages for `ota: platform: http_request`
-  (see open item 4 in `CLAUDE.md`).
+  GitHub Release or GitHub Pages for `ota: platform: http_request`.
 
-The repo and deploy key must be created by the owner.
+The owner has to create the public repo and the deploy key.
