@@ -39,6 +39,11 @@ esp8266:
   restore_from_flash: true
 
 logger:
+  logs:
+    # Both log the Wi-Fi password in plain text when it is set (captive portal
+    # at INFO, Improv serial at DEBUG); keep those lines out of the logs.
+    captive_portal: WARN
+    improv_serial: INFO
 
 api:
   services:
@@ -95,9 +100,12 @@ time:
     id: sntp_time
 
 button:
+  # Internal: a factory reset needs physical access (hold the button
+  # 10-20 s), so nobody on the network can wipe the clock.
   - platform: factory_reset
     id: factory_reset_button
     name: Factory Reset Word Clock
+    internal: true
   - platform: restart
     id: restart_button
     name: Restart Word Clock

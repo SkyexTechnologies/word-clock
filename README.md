@@ -50,7 +50,7 @@ minute dots.
 | 07. Indication: It is | Show or hide "HET IS" |
 | 08. Indication: Minutes | Show or hide the four minute dots |
 | 09. Indication: Week Days | Show or hide the weekday letter |
-| Restart / Factory Reset | Buttons |
+| Restart Word Clock | Button. A factory reset is only possible with the physical button (hold 10-20 s), not over the network |
 | Layout Provisioned | Diagnostic: on when a valid word layout is stored; off means no layout, and the clock runs its LED self-test until it is provisioned |
 
 ## Getting started
@@ -250,8 +250,8 @@ adding features (see [design notes](docs/design-notes.md#guardrails)).
 
 Erase the layout to rerun the [LED self-test](#led-self-test), to reuse a board
 behind a different letter grid, or to return a unit to its factory state. The
-layout cannot be removed over Wi-Fi, and the factory reset (button or
-`Factory Reset Word Clock`) keeps it on purpose: that reset only clears Wi-Fi
+layout cannot be removed over Wi-Fi, and the factory reset (hold the
+button 10-20 s) keeps it on purpose: that reset only clears Wi-Fi
 and settings in sector 251.
 
 Connect the clock over USB (as for the USB layout writer above), then erase
