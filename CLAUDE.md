@@ -43,7 +43,10 @@ works on macOS in VS Code with the ESPHome extension.
 - `external_components` loads `wordclock_layout` from
   `github://SkyexTechnologies/word-clock@main`, not a local path, so adopted
   configs can find it. Local builds therefore use the pushed component; push
-  component changes before building.
+  component changes before building. ESPHome caches the clone for a day: after
+  pushing a component change, delete `.esphome/external_components/` so the
+  next build fetches it. To test component changes before pushing, point the
+  source temporarily at `type: local`, `path: components` (never commit that).
 - `dashboard_import` points at `word-clock.yaml` on `main`, so it and
   `components/` must stay at the repo root.
 - `project_version` is `X.Y.Z-dev` between releases (nothing shipped yet; the
