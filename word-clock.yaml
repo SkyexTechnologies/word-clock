@@ -2,7 +2,7 @@ substitutions:
   name: "word-clock"
   friendly_name: "Word Clock"
   project_name: "Skyex Technologies.Word Clock"
-  project_version: "1.0.0"
+  project_version: "1.0.0-dev"
 
 esphome:
   name: "${name}"

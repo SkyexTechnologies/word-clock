@@ -45,7 +45,10 @@ works on macOS in VS Code with the ESPHome extension.
   configs can find it. Local builds therefore use the pushed component; push
   component changes before building.
 - `dashboard_import` points at `word-clock.yaml` on `main`, so it and
-  `components/` must stay at the repo root. Bump `project_version` per release.
+  `components/` must stay at the repo root.
+- `project_version` is `X.Y.Z-dev` between releases (nothing shipped yet; the
+  first release will be `1.0.0`). Don't bump it per change: on release, drop
+  `-dev` and tag the commit `vX.Y.Z`, then set the next `-dev` version.
 - `esphome: min_version` must match the pin in `requirements.txt`.
 - Timezone: no explicit `timezone:`, so Home Assistant supplies it; the
   `06. Time Zone` select can override it. Add zones only with verified
