@@ -198,6 +198,10 @@ script:
 
           if (timezone_index == 0) {
             esphome::time::set_global_tz(build_timezone);
+            // When Home Assistant is connected, ask it for the time now: its
+            // reply also restores its timezone, instead of keeping the build
+            // timezone until the next periodic sync. Does nothing without HA.
+            id(homeassistant_time).update();
             return;
           }
           // Upper bound = last option index; raise it when appending a zone.
