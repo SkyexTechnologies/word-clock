@@ -16,9 +16,9 @@ static const uint8_t NUM_LEDS = 121;
 static const uint32_t CONFIG_MAGIC = 0x574C4B31;  // "WLK1"
 static const uint8_t CONFIG_VERSION = 1;
 static const uint16_t EEPROM_SIZE = 512;
-// Sector 250 (0x402FA000) is reserved by the custom 1 MB linker script.
-// ESPHome preferences remain in sector 251 (0x402FB000).
-static const uint32_t LAYOUT_FLASH_SECTOR = 250;
+// Sector 1018 (0x405FA000) is reserved by the custom 4 MB linker script.
+// ESPHome preferences remain in sector 1019 (0x405FB000).
+static const uint32_t LAYOUT_FLASH_SECTOR = 1018;
 
 struct LayoutBlob {
   uint32_t magic;

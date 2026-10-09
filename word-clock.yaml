@@ -42,9 +42,10 @@ wordclock_layout:
   id: layout
 
 esp8266:
-  board: esp01_1m
-  # Layout sector 250 and ESPHome preferences sector 251 are isolated by the
-  # linker script supplied by components/wordclock_layout.
+  # ESP-12S modules have 4 MB of flash. The linker script supplied by
+  # components/wordclock_layout replaces the 4 MB flash map: layout sector 1018
+  # and ESPHome preferences sector 1019, with about 3 MB for OTA staging.
+  board: esp12e
   restore_from_flash: true
 
 logger:
@@ -136,7 +137,7 @@ binary_sensor:
         max_length: 20s
         then:
           - button.press: factory_reset_button
-  # Off means the word layout in flash sector 250 is missing or corrupt, so
+  # Off means the word layout in flash sector 1018 is missing or corrupt, so
   # the clock runs its LED self-test until it is provisioned (see README).
   - platform: template
     id: layout_provisioned

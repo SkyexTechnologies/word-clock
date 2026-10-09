@@ -5,7 +5,7 @@ by Skyex Technologies. A 121-LED WS2812X strip sits behind a letter grid and
 lights up the words for the current time, the weekday letter, and up to four
 minute dots.
 
-- **Hardware:** ESP-12S (ESP8266, `esp01_1m` board profile)
+- **Hardware:** ESP-12S with 4 MB flash (ESP8266, `esp12e` board profile)
 - **Framework:** [ESPHome](https://esphome.io)
 - **Main config:** [`word-clock.yaml`](word-clock.yaml)
 
@@ -167,9 +167,9 @@ layout needs different indices.
 - **LED layout:** the LED-to-word table is stored in a dedicated flash sector,
   not compiled into the firmware. A new or unprovisioned clock runs an LED
   self-test (see [LED self-test and setup signals](#led-self-test-and-setup-signals))
-  until its layout is written once. The custom 1 MB linker map keeps OTA writes away
-  from the layout and ESPHome-preferences sectors. After installing this
-  storage fix from older firmware, provision the layout again once.
+  until its layout is written once. The custom 4 MB linker map keeps OTA writes
+  away from the layout and ESPHome-preferences sectors. Clocks flashed with the
+  earlier 1 MB flash map need a one-time USB flash and layout write.
 - **Pinned ESPHome and Python versions:** `requirements.txt` pins ESPHome.
   Check the release's supported Python versions before upgrading; ESPHome
   2026.9.1 requires Python 3.12-3.14.
@@ -232,42 +232,41 @@ Use 3.3 V UART levels; if the adapter has no automatic reset/bootloader
 circuit, enter ESP8266 bootloader mode (GPIO0 low while resetting). On Windows,
 pass the adapter's COM port (for example, `COM3`). The script asks for
 confirmation, builds the same versioned/checksummed layout blob used by the
-firmware, then uses the ESPHome-installed `esptool` to write only sector 250
-(`0xFA000`). Use `--layout` for another layout JSON, `--baud` to change the
+firmware, then uses the ESPHome-installed `esptool` to write only sector 1018
+(`0x3FA000`). Use `--layout` for another layout JSON, `--baud` to change the
 serial speed, or `--yes` to skip confirmation in a controlled factory process.
 Do not use `esptool erase-flash`: that erases the firmware and saved settings as
 well as the layout. After flashing, restart the clock and confirm the log says
 it loaded the layout, or that `Layout Provisioned` is on. The USB tool is for
-the project's 1 MB `esp01_1m` flash map; use the API provisioner for other
-flash layouts.
+the project's 4 MB flash map; use the API provisioner for other flash layouts.
 
-The firmware reserves flash sector 250 for the layout and sector 251 for
-ESPHome preferences. Keep the `esp01_1m` board and the project linker script
-together; changing either can invalidate the storage map. Wireless updates
-need room for two firmware images in flash, so check the firmware size when
-adding features (see [design notes](docs/design-notes.md#guardrails)).
+The firmware reserves flash sector 1018 for the layout and sector 1019 for
+ESPHome preferences. Keep the `esp12e` board and the project linker script
+together; changing either can invalidate the storage map. The firmware can
+grow to about 1 MB, the ESP8266 maximum, with about 3 MB of flash left for
+staging updates (see [design notes](docs/design-notes.md#guardrails)).
 
 ### Removing the layout
 
-Erase the layout to rerun the [LED self-test](#led-self-test-and-setup-signals), to reuse a board
-behind a different letter grid, or to return a unit to its factory state. The
-layout cannot be removed over Wi-Fi, and the factory reset (hold the
-button 10-20 s) keeps it on purpose: that reset only clears Wi-Fi
-and settings in sector 251.
+Erase the layout to rerun the [LED self-test](#led-self-test-and-setup-signals),
+to reuse a board behind a different letter grid, or to return a unit to its
+factory state. The layout cannot be removed over Wi-Fi, and the factory reset
+(hold the button 10-20 s) keeps it on purpose: that reset only clears Wi-Fi and
+settings in sector 1019.
 
 Connect the clock over USB (as for the USB layout writer above), then erase
 only the 4 KB layout sector:
 
 ```bash
 source .venv/bin/activate
-python -m esptool --chip esp8266 --port /dev/cu.usbserial-XXXX erase-region 0xFA000 0x1000
+python -m esptool --chip esp8266 --port /dev/cu.usbserial-XXXX erase-region 0x3FA000 0x1000
 ```
 
 Restart the clock. It starts the LED self-test, and `Layout Provisioned` is
 off. Firmware, Wi-Fi and settings are untouched. To put a layout back, use
 either method under [Writing the layout](#writing-the-layout).
 
-- Use exactly `0xFA000 0x1000`. Another address or length can erase the
+- Use exactly `0x3FA000 0x1000`. Another address or length can erase the
   firmware, the settings or the Wi-Fi calibration data.
 - Never use `esptool erase-flash`; it erases everything.
-- The address only applies to the project's 1 MB `esp01_1m` flash map.
+- The address only applies to the project's 4 MB flash map (`esp12e`).

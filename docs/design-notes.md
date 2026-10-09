@@ -15,10 +15,11 @@ runs the same binary, and an update must never need per-device data.
 
 ### Decision
 
-Store the table in dedicated flash sector 250 (`0x402FA000`) on the 1 MB
-`esp01_1m` layout. ESPHome preferences use sector 251 (`0x402FB000`). A custom
-linker script moves the OTA staging boundary down by one sector, keeping OTA
-writes below the layout sector. The `wordclock_layout` component loads the
+Store the table in dedicated flash sector 1018 (`0x405FA000`) of the ESP-12S's
+4 MB flash (`esp12e` board profile). ESPHome preferences use sector 1019
+(`0x405FB000`). A custom linker script, based on the framework's
+`eagle.flash.4m.ld`, moves the OTA staging boundary down by one sector, keeping
+OTA writes below the layout sector. The `wordclock_layout` component loads the
 table once at boot, and the Clock effect reads it from RAM.
 
 Ruled out:
@@ -52,24 +53,25 @@ Ruled out:
     commits it. `scripts/provision_layout.py` sends
     `provisioning/default-layout.json` (or another file) to it.
   - **Over USB serial:** `scripts/provision_layout_usb.py` builds the same blob
-    and writes only sector 250 (physical offset `0xFA000`) with esptool, for
+    and writes only sector 1018 (physical offset `0x3FA000`) with esptool, for
     factory setup before Wi-Fi is available.
 - Changing the table shape means bumping `CONFIG_VERSION` and re-provisioning
   every unit.
 
 ### Guardrails
 
-- Keep `board: esp01_1m` and the 1 MB flash map. The custom linker script
-  reserves sector 250 and ends OTA staging at `0x402FA000`.
-- Keep ESPHome preferences in sector 251; do not move `_SPIFFS_end` onto sector
-  250 or restore the stock linker script.
-- OTA needs room for the running image and the staged incoming image together
-  within the 1,024,000 bytes below sector 250. ESPHome's native OTA sends the
-  update gzip-compressed and stages it compressed (e.g. 485,088-byte image
-  staged as 345,392 bytes), so the image can grow to roughly 590 KB, depending
-  on how well it compresses. Uploading an uncompressed `.bin` (e.g. through
-  the web server OTA page) stages it uncompressed, which limits the image to
-  about 512 KB. Check the image size on every release.
+- Keep `board: esp12e` and the 4 MB flash map. The custom linker script
+  reserves sector 1018 and ends OTA staging at `0x405FA000`.
+- Keep ESPHome preferences in sector 1019; do not move `_SPIFFS_end` onto
+  sector 1018 or restore the stock linker script.
+- The firmware itself can be at most 1,044,464 bytes (the ESP8266's mapped
+  flash window). Updates are staged in the roughly 3 MB between the end of the
+  firmware and the layout sector, so staging space is not a constraint.
+- History: until October 2026 the project used the 1 MB `esp01_1m` map (layout
+  in sector 250). There, the running and the staged image had to share about
+  1 MB, which limited the firmware to roughly 512-590 KB and ruled out HTTPS
+  updates (BearSSL adds about 148 KB). The ESP-12S has 4 MB, so the map was
+  switched.
 - Keep the blob format and flash offset identical in the component, the linker
   script and `scripts/provision_layout_usb.py`.
 - Keep the provisioning path separate from anything the update flow touches.

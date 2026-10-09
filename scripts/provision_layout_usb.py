@@ -13,7 +13,7 @@ from provision_layout import load_layout
 NUM_WORDS = 37
 LEDS_PER_WORD = 12
 FLASH_SECTOR_SIZE = 4096
-FLASH_OFFSET = 0xFA000  # Physical offset for memory-mapped sector 250 (0x402FA000).
+FLASH_OFFSET = 0x3FA000  # Physical offset for memory-mapped sector 1018 (0x405FA000).
 CONFIG_MAGIC = 0x574C4B31  # "WLK1"
 CONFIG_VERSION = 1
 DEFAULT_LAYOUT = Path(__file__).resolve().parents[1] / "provisioning" / "default-layout.json"
@@ -52,7 +52,7 @@ def main() -> None:
     image = build_sector_image(flat_layout)
 
     print(
-        f"Ready to write {len(image)} bytes to flash sector 250 at 0x{FLASH_OFFSET:05X} "
+        f"Ready to write {len(image)} bytes to flash sector 1018 at 0x{FLASH_OFFSET:06X} "
         f"on {args.port}. The firmware and other flash sectors will not be written."
     )
     if not args.yes and input("Type 'yes' to continue: ").strip().lower() != "yes":
@@ -74,7 +74,7 @@ def main() -> None:
             str(args.baud),
             "write-flash",
             "--flash-size",
-            "1MB",
+            "4MB",
             f"0x{FLASH_OFFSET:X}",
             str(image_path),
         ]

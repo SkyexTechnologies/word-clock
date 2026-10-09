@@ -17,9 +17,10 @@ CONFIG_SCHEMA = cv.Schema(
 
 
 async def to_code(config):
-    # Reserve the final 4 KB of the OTA staging region for the per-device
-    # layout. This project targets the 1 MB esp01_1m flash map.
-    linker_script = Path(__file__).with_name("eagle.flash.1m.wordclock.ld")
+    # Reserve the 4 KB sector below the ESPHome preferences for the per-device
+    # layout, outside OTA staging. This project targets 4 MB ESP-12S modules
+    # (board esp12e); the linker script replaces ESPHome's 4 MB flash map.
+    linker_script = Path(__file__).with_name("eagle.flash.4m.wordclock.ld")
     cg.add_platformio_option("board_build.ldscript", str(linker_script))
 
     var = cg.new_Pvariable(config[CONF_ID])

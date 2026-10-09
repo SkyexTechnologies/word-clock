@@ -1,7 +1,7 @@
 # Word Clock — project context for Claude
 
 Dutch word clock firmware by Skyex Technologies (owner: Guido). Written in
-ESPHome YAML for an ESP-12S (ESP8266, `esp01_1m` board profile) driving 121
+ESPHome YAML for an ESP-12S (ESP8266, 4 MB flash, `esp12e` board profile) driving 121
 WS2812X LEDs behind a letter grid. The product is meant to be sold, so
 decisions favour: one generic firmware for all customers, self-service updates
 by customers, and no hard dependency on internet access.
@@ -15,7 +15,7 @@ open work is tracked in GitHub Issues (`gh issue list`; `gh` is installed at
 
 - `word-clock.yaml` — the complete firmware config.
 - `components/wordclock_layout/` — external component and linker script that
-  store the per-device LED word table in flash sector 250.
+  store the per-device LED word table in flash sector 1018 (4 MB flash map).
 - `provisioning/default-layout.json` — default factory layout.
 - `scripts/provision_layout.py` (LAN, via API) and
   `scripts/provision_layout_usb.py` (USB serial) — one-time layout writers.
@@ -60,14 +60,16 @@ works on macOS in VS Code with the ESPHome extension.
 - **No RTC chip.** Firmware-only solutions on the current hardware.
 - **Offline time:** Home Assistant time over the native API, plus SNTP (a bare
   local IP where there is no DNS).
-- **Per-device LED layout** lives in flash sector 250, separate from ESPHome
-  preferences in sector 251. The shared ESPHome preferences pool (512 bytes,
+- **Per-device LED layout** lives in flash sector 1018, separate from ESPHome
+  preferences in sector 1019. The shared ESPHome preferences pool (512 bytes,
   used by every restored entity and the Wi-Fi credentials) can't hold it.
   Fresh devices need a one-time layout write.
 
 ## Guardrails
 
-- Keep `board: esp01_1m` and the custom linker script in sync.
+- **4 MB flash map** (decided 2026-10-09, replacing `esp01_1m`): keep
+  `board: esp12e` and `eagle.flash.4m.wordclock.ld` in sync. Changing the map
+  moves the layout and settings sectors (USB flash + re-provisioning).
 - ESP8266 preferences are stored by position, in component setup order, with
   the Wi-Fi credentials last. Adding, removing or resizing anything that
   restores state (restore_value numbers/selects, switches, light
@@ -78,9 +80,8 @@ works on macOS in VS Code with the ESPHome extension.
 - The light (setup priority 799) is set up before the layout component (600)
   and Wi-Fi. Keep it off during setup (`RESTORE_AND_OFF`) and turn it on in
   `on_boot`; turning it on earlier crashed the fallback hotspot.
-- OTA size limit: the image (~485 KB) can grow to roughly 590 KB with
-  ESPHome's compressed native OTA, but only ~512 KB if an uncompressed `.bin`
-  is uploaded (web server OTA). Check the image size when adding features.
+- Firmware size limit: 1,044,464 bytes (ESP8266 mapped flash window). OTA
+  staging has about 3 MB, so it is not a constraint.
 - Keep the layout blob format and flash offset identical in the component and
   `scripts/provision_layout_usb.py`.
 - Recheck the `aioesphomeapi` calls in `scripts/provision_layout.py` when
