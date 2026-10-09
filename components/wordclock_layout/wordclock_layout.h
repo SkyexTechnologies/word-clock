@@ -32,6 +32,9 @@ class WordClockLayout : public Component {
   void setup() override {
     this->layout_eeprom_.begin(EEPROM_SIZE);
     this->layout_eeprom_.get(0, blob_);
+    // blob_ holds the copy we use; free the EEPROM library's 512-byte RAM
+    // buffer. Nothing was changed, so end() does not write to flash.
+    this->layout_eeprom_.end();
 
     loaded_ = blob_.magic == CONFIG_MAGIC && blob_.version == CONFIG_VERSION &&
               blob_.checksum == this->checksum_() && this->values_valid_();
@@ -77,8 +80,11 @@ class WordClockLayout : public Component {
     blob_.version = CONFIG_VERSION;
     blob_.checksum = this->checksum_();
 
+    // The buffer is only allocated while writing (see setup()).
+    this->layout_eeprom_.begin(EEPROM_SIZE);
     this->layout_eeprom_.put(0, blob_);
     loaded_ = this->layout_eeprom_.commit();
+    this->layout_eeprom_.end();
     if (loaded_) {
       ESP_LOGI(TAG, "Saved word layout to EEPROM");
     } else {
