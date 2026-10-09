@@ -33,13 +33,14 @@ minute dots.
 - Smooth fade between times, adjustable from 0 to 10 seconds.
 - Settings are stored in flash and survive power loss (`restore_from_flash`).
 - WiFi setup through a captive portal or Improv over serial; local web server
-  on port 80; native API for Home Assistant.
+  on port 80 (works without Home Assistant, including a colour picker); native
+  API for Home Assistant.
 
 ### Settings exposed in Home Assistant / the web UI
 
 | Entity | What it does |
 | --- | --- |
-| 01. Word Clock | The light itself (on/off, colour, brightness) |
+| 01. Word Clock | The light itself: on/off, colour (colour picker in the web UI) and brightness |
 | 02. Transition | Fade time between times, 0-10 s |
 | 03. Automatic Brightness | On: follow the light sensor. Off: manual brightness |
 | 04. / 05. Minimum / Maximum Brightness | Range used by automatic brightness |
@@ -47,7 +48,6 @@ minute dots.
 | 07. Indication: It is | Show or hide "HET IS" |
 | 08. Indication: Minutes | Show or hide the four minute dots |
 | 09. Indication: Week Days | Show or hide the weekday letter |
-| 10. / 11. / 12. Red / Green / Blue | Colour channels (disabled by default) |
 | Restart / Factory Reset | Buttons |
 | Layout Provisioned | Diagnostic: on when a valid word layout is stored; off means no layout, and the clock runs its LED self-test until it is provisioned |
 

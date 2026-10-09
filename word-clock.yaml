@@ -65,7 +65,10 @@ improv_serial:
 web_server:
   port: 80
   local: True
-  
+  # Version 3 has a colour picker for the light, so the colour can be set
+  # without Home Assistant.
+  version: 3
+
 dashboard_import:
   package_import_url: github://SkyexTechnologies/word-clock/word-clock.yaml@main
   import_full_config: False
@@ -295,6 +298,10 @@ script:
                   return brightness;
 
 number:
+  # Red/green/blue are hidden: the colour is set on the light itself. They
+  # stay because they store the colour across reboots, and removing them
+  # would shift the ESP8266 flash preferences (including the Wi-Fi
+  # credentials, which are stored last).
   - platform: template
     name: "10. Red"
     id: red
@@ -303,7 +310,7 @@ number:
     max_value: 1
     step: 0.01
     restore_value: True
-    disabled_by_default: True
+    internal: True
     icon: "mdi:palette"
     on_value:
       then:
@@ -324,7 +331,7 @@ number:
     max_value: 1
     step: 0.01
     restore_value: True
-    disabled_by_default: True
+    internal: True
     icon: "mdi:palette"
     on_value:
       then:
@@ -345,7 +352,7 @@ number:
     max_value: 1
     step: 0.01
     restore_value: True
-    disabled_by_default: True
+    internal: True
     icon: "mdi:palette"
     on_value:
       then:
