@@ -194,8 +194,9 @@ or time and repeats continuously:
    every colour; a dark LED or a missing colour points to a faulty LED or
    solder joint.
 2. A single white LED steps from LED 0 to LED 120, 0.1 s each. It shows the
-   wiring order, and the log prints `[led_test] LED n` at each step, which helps
-   when creating a layout for a new letter grid.
+   wiring order. With `logger: level: VERBOSE`, the log also prints
+   `[led_test] LED n` at each step, which helps when creating a layout for a
+   new letter grid.
 
 The light's brightness setting still applies. Once a layout is written, the
 clock switches to showing the time without a restart.

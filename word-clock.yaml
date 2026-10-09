@@ -546,7 +546,8 @@ light:
              * one, and every LED and colour channel can be checked before
              * provisioning. Needs no layout, Wi-Fi or time.
              * 1. All LEDs red, green, blue, white (1 s each).
-             * 2. One white LED steps from 0 to 120 (100 ms each), logging its index.
+             * 2. One white LED steps from 0 to 120 (100 ms each), logging its index
+             *    at VERBOSE level (set logger: level: VERBOSE to see it).
              */
             if (!id(layout).is_provisioned()) {
               // 128 is about 14% PWM after gamma correction, which keeps the
@@ -569,7 +570,7 @@ light:
                 it.all() = Color::BLACK;
                 it[led] = Color::WHITE;
                 if (led != last_led) {
-                  ESP_LOGD("led_test", "LED %d", led);
+                  ESP_LOGV("led_test", "LED %d", led);
                   last_led = led;
                 }
               }
