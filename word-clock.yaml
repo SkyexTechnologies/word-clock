@@ -16,8 +16,17 @@ esphome:
   on_boot:
     priority: -10
     then:
+      # Turn on with the Clock effect in one call: the effect is dropped while
+      # the light restores switched off, and turning on without it first shows
+      # all LEDs in the light's colour. With the effect active, the default
+      # transition only fades the brightness of what the effect draws.
       - light.turn_on:
           id: word_clock
+          effect: Clock
+      # Without a layout this sets full brightness for the colour test.
+      - script.execute:
+          id: set_light_brightness
+          quick_transition: true
       - script.execute:
           id: apply_timezone
           timezone_index: !lambda return id(timezone).active_index().value_or(0);
@@ -280,20 +289,27 @@ script:
     parameters:
       quick_transition: bool
     then:
-      - if: 
+      - if:
           condition:
-            and: 
-              - switch.is_on: automatic_brightness
-              - light.is_on: word_clock
-              # The light sensor has no reading for up to 15 s after boot, but
-              # the brightness numbers already call this script when they
-              # restore. Skip until there is a reading instead of using NaN.
-              - lambda: return !std::isnan(id(light_sensor).state);
+            light.is_on: word_clock
           then:
             - lambda: |-
-                float min_brightness = id(minimum_brightness).state;
-                float max_brightness = id(maximum_brightness).state;
-                float brightness = (max_brightness - min_brightness) * id(light_sensor).state + min_brightness;
+                float brightness;
+                if (!id(layout).is_provisioned()) {
+                  // No layout: the colour test runs at full brightness, whatever
+                  // the sensor or the 03. Automatic Brightness switch says.
+                  brightness = 1.0f;
+                } else if (!id(automatic_brightness).state ||
+                           std::isnan(id(light_sensor).state)) {
+                  // Manual brightness, or no sensor reading yet (up to 15 s
+                  // after boot, while the brightness numbers already call this
+                  // script when they restore): leave the brightness alone.
+                  return;
+                } else {
+                  float min_brightness = id(minimum_brightness).state;
+                  float max_brightness = id(maximum_brightness).state;
+                  brightness = (max_brightness - min_brightness) * id(light_sensor).state + min_brightness;
+                }
                 // Not saved: the sensor adjusts brightness every 15 s, and
                 // saving each change would wear out the settings flash sector.
                 // Only changes made by the user are restored after a reboot.
@@ -416,44 +432,35 @@ light:
             }
 
             /*
-             * No valid word layout: run an LED self-test instead of the clock.
-             * An unprovisioned clock is then visibly different from a broken
-             * one, and every LED and colour channel can be checked before
-             * provisioning. Needs no layout, Wi-Fi or time.
-             * 1. All LEDs red, green, blue, white (1 s each).
-             * 2. One white LED steps from 0 to 120 (100 ms each), logging its index
-             *    at VERBOSE level (set logger: level: VERBOSE to see it).
+             * Setup states, shown instead of the time:
+             * - No valid word layout: all LEDs cycle red, green, blue (1 s each)
+             *   at full brightness (set_light_brightness forces 100%), so every
+             *   LED and colour channel can be checked before provisioning. White
+             *   is skipped: all LEDs at full white draw about 7 A.
+             * - No time yet since power-on (no Wi-Fi, Home Assistant or NTP):
+             *   one LED at a time steps through all LEDs (100 ms each) in the
+             *   light's colour. Its index is logged at VERBOSE level, which helps
+             *   when mapping a new letter grid. Once the time is known, a later
+             *   Wi-Fi drop doesn't bring this back: the clock keeps its time.
              */
             if (!id(layout).is_provisioned()) {
-              // 128 is about 14% PWM after gamma correction, which keeps the
-              // supply current low with all LEDs on.
-              static const uint8_t TEST_LEVEL = 128;
               static const uint32_t COLOUR_MS = 1000;
-              static const uint32_t CHASE_MS = 100;
-              static int last_led = -1;
-              const Color colours[4] = {
-                  Color(TEST_LEVEL, 0, 0), Color(0, TEST_LEVEL, 0),
-                  Color(0, 0, TEST_LEVEL), Color(TEST_LEVEL, TEST_LEVEL, TEST_LEVEL)};
-
-              const uint32_t solid_ms = 4 * COLOUR_MS;
-              const uint32_t t = millis() % (solid_ms + it.size() * CHASE_MS);
-              if (t < solid_ms) {
-                it.all() = colours[t / COLOUR_MS];
-                last_led = -1;
-              } else {
-                const int led = (t - solid_ms) / CHASE_MS;
-                it.all() = Color::BLACK;
-                it[led] = Color::WHITE;
-                if (led != last_led) {
-                  ESP_LOGV("led_test", "LED %d", led);
-                  last_led = led;
-                }
-              }
+              const Color colours[3] = {Color(255, 0, 0), Color(0, 255, 0), Color(0, 0, 255)};
+              it.all() = colours[(millis() / COLOUR_MS) % 3];
               return;
             }
 
             auto time = id(sntp_time).now();
             if (!time.is_valid()) {
+              static const uint32_t CHASE_MS = 100;
+              static int last_led = -1;
+              const int led = (millis() / CHASE_MS) % it.size();
+              it.all() = Color::BLACK;
+              it[led] = current_color;
+              if (led != last_led) {
+                ESP_LOGV("led_test", "LED %d", led);
+                last_led = led;
+              }
               return;
             }
 

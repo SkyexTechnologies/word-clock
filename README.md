@@ -51,7 +51,7 @@ minute dots.
 | 08. Indication: Minutes | Show or hide the four minute dots |
 | 09. Indication: Week Days | Show or hide the weekday letter |
 | Restart Word Clock | Button. A factory reset is only possible with the physical button (hold 10-20 s), not over the network |
-| Layout Provisioned | Diagnostic: on when a valid word layout is stored; off means no layout, and the clock runs its LED self-test until it is provisioned |
+| Layout Provisioned | Diagnostic: on when a valid word layout is stored; off means no layout, and the clock runs its LED self-test (colour cycle) until it is provisioned |
 
 ## Getting started
 
@@ -166,7 +166,7 @@ layout needs different indices.
   an NTP server to recover the current time.
 - **LED layout:** the LED-to-word table is stored in a dedicated flash sector,
   not compiled into the firmware. A new or unprovisioned clock runs an LED
-  self-test (see [Provisioning a word layout](#provisioning-a-word-layout))
+  self-test (see [LED self-test and setup signals](#led-self-test-and-setup-signals))
   until its layout is written once. The custom 1 MB linker map keeps OTA writes away
   from the layout and ESPHome-preferences sectors. After installing this
   storage fix from older firmware, provision the layout again once.
@@ -186,22 +186,23 @@ ESPHome Dashboard can be adopted straight from
 
 ## Provisioning a word layout
 
-### LED self-test
+### LED self-test and setup signals
 
-Until a layout is written, the clock runs an LED self-test instead of showing
-the time, so a new unit can be checked before provisioning. It needs no Wi-Fi
-or time and repeats continuously:
+Until the clock is fully set up, the LEDs show its state instead of the time:
 
-1. All LEDs red, green, blue and white, one second each. Every LED should show
-   every colour; a dark LED or a missing colour points to a faulty LED or
-   solder joint.
-2. A single white LED steps from LED 0 to LED 120, 0.1 s each. It shows the
-   wiring order. With `logger: level: VERBOSE`, the log also prints
-   `[led_test] LED n` at each step, which helps when creating a layout for a
-   new letter grid.
+| State | What the LEDs do |
+| --- | --- |
+| **No layout written** (LED self-test) | All LEDs cycle red, green and blue at full brightness, one second each. Every LED should show every colour; a dark LED or a missing colour points to a faulty LED or solder joint. Needs no Wi-Fi or time. |
+| **Layout written, but no time yet since power-on** (no Wi-Fi, Home Assistant or NTP) | A single LED steps through all 121 LEDs, 0.1 s each, in the clock's colour. This also shows the wiring order. |
+| **Time known** | The time in words. If Wi-Fi drops later, the clock keeps showing the time it knows. |
 
-The light's brightness setting still applies. Once a layout is written, the
-clock switches to showing the time without a restart.
+The self-test always runs at full brightness, whatever the brightness settings
+say. White is left out on purpose: all LEDs at full white draw about 7 A. Once a
+layout is written, the clock switches to the next state without a restart.
+
+To map the wiring of a new letter grid, write any layout (for example the
+default), keep the clock offline, and set `logger: level: VERBOSE`: the log then
+prints `[led_test] LED n` for each LED of the running light.
 
 ### Writing the layout
 
@@ -248,7 +249,7 @@ adding features (see [design notes](docs/design-notes.md#guardrails)).
 
 ### Removing the layout
 
-Erase the layout to rerun the [LED self-test](#led-self-test), to reuse a board
+Erase the layout to rerun the [LED self-test](#led-self-test-and-setup-signals), to reuse a board
 behind a different letter grid, or to return a unit to its factory state. The
 layout cannot be removed over Wi-Fi, and the factory reset (hold the
 button 10-20 s) keeps it on purpose: that reset only clears Wi-Fi

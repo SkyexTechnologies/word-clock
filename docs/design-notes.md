@@ -40,9 +40,9 @@ Ruled out:
 - `setup()` reads the blob. If magic, version, checksum or any LED index is
   wrong (blank or corrupt unit), it logs an error and keeps the table at `-1`
   instead of lighting random LEDs. The Clock effect then runs an LED self-test
-  on the raw LED indices (all LEDs per colour, then a single-LED chase), so an
-  unprovisioned clock is visibly different from a broken one and can be
-  checked at the factory before provisioning.
+  on the raw LED indices (all LEDs cycling red, green, blue at full
+  brightness), so an unprovisioned clock is visibly different from a broken
+  one and can be checked at the factory before provisioning.
 - The effect lambda calls `id(layout).led_for(row, slot)`; `-1` means unused.
 - `on_boot` priority -10 runs after component `setup()`, so the table is
   loaded before the Clock effect starts.
