@@ -278,93 +278,20 @@ script:
               # restore. Skip until there is a reading instead of using NaN.
               - lambda: return !std::isnan(id(light_sensor).state);
           then:
-            - light.control:
-                id: word_clock
-                transition_length: !lambda |-
-                  if (quick_transition) 
-                    return 500;
-                  return 10000;
-                brightness: !lambda |-
-                  float min_brightness = id(minimum_brightness).state;
-                  float max_brightness = id(maximum_brightness).state;
-                  float sensor_reading = id(light_sensor).state;
-                  float brightness = (max_brightness - min_brightness) * sensor_reading + min_brightness;
-                  if (brightness > 1.0) {
-                    brightness = 1.0;
-                  }
-                  if (brightness < 0.0) {
-                    brightness = 0.0;
-                  }
-                  return brightness;
+            - lambda: |-
+                float min_brightness = id(minimum_brightness).state;
+                float max_brightness = id(maximum_brightness).state;
+                float brightness = (max_brightness - min_brightness) * id(light_sensor).state + min_brightness;
+                // Not saved: the sensor adjusts brightness every 15 s, and
+                // saving each change would wear out the settings flash sector.
+                // Only changes made by the user are restored after a reboot.
+                id(word_clock).make_call()
+                    .set_brightness(clamp(brightness, 0.0f, 1.0f))
+                    .set_transition_length(quick_transition ? 500 : 10000)
+                    .set_save(false)
+                    .perform();
 
 number:
-  # Red/green/blue are hidden: the colour is set on the light itself. They
-  # stay because they store the colour across reboots, and removing them
-  # would shift the ESP8266 flash preferences (including the Wi-Fi
-  # credentials, which are stored last).
-  - platform: template
-    name: "10. Red"
-    id: red
-    optimistic: True
-    min_value: 0
-    max_value: 1
-    step: 0.01
-    restore_value: True
-    internal: True
-    icon: "mdi:palette"
-    on_value:
-      then:
-        - if:
-            condition:
-              - lambda: "return id(word_clock).remote_values.get_red() != x;"
-            then:
-              - light.control:
-                  id: word_clock
-                  red: !lambda "return x;"
-                  green: !lambda "return id(green).state;"
-                  blue: !lambda "return id(blue).state;"
-  - platform: template
-    name: "11. Green"
-    id: green
-    optimistic: True
-    min_value: 0
-    max_value: 1
-    step: 0.01
-    restore_value: True
-    internal: True
-    icon: "mdi:palette"
-    on_value:
-      then:
-        - if:
-            condition:
-              - lambda: "return id(word_clock).remote_values.get_green() != x;"
-            then:
-              - light.control:
-                  id: word_clock
-                  red: !lambda "return id(red).state;"
-                  green: !lambda "return x;"
-                  blue: !lambda "return id(blue).state;"
-  - platform: template
-    name: "12. Blue"
-    id: blue
-    optimistic: True
-    min_value: 0
-    max_value: 1
-    step: 0.01
-    restore_value: True
-    internal: True
-    icon: "mdi:palette"
-    on_value:
-      then:
-        - if:
-            condition:
-              - lambda: "return id(word_clock).remote_values.get_blue() != x;"
-            then:
-              - light.control:
-                  id: word_clock
-                  red: !lambda "return id(red).state;"
-                  green: !lambda "return id(green).state;"
-                  blue: !lambda "return x;"
   - platform: template
     name: "02. Transition"
     id: transition
@@ -415,17 +342,6 @@ number:
       - script.execute: 
           id: set_light_brightness
           quick_transition: True
-  - platform: template
-    name: "Brightness"
-    id: brightness
-    optimistic: True
-    min_value: 0.01
-    max_value: 1
-    initial_value: 1
-    step: 0.01
-    restore_value: True
-    internal: True
-
 sensor:
   - platform: adc
     pin: A0
@@ -448,6 +364,11 @@ light:
     id: word_clock
     default_transition_length: 10s
     icon: "mdi:file-word-box-outline"
+    # The light saves its own colour, brightness and effect; automatic
+    # brightness is not saved (see set_light_brightness). RESTORE_AND_OFF keeps
+    # it off during setup: the light is set up before the layout component and
+    # Wi-Fi, and is switched on in on_boot instead.
+    restore_mode: RESTORE_AND_OFF
     on_state:
       then:
         - if:
@@ -461,64 +382,6 @@ light:
               - light.control:
                   id: word_clock
                   effect: Clock
-        - if:
-            condition:
-              and:
-                - lambda: "return id(word_clock).remote_values.get_red() != id(red).state;"
-                - light.is_on: word_clock
-            then:
-              - number.set:
-                  id: red
-                  value: !lambda "return id(word_clock).remote_values.get_red();"
-        - if:
-            condition:
-              and:
-                - lambda: "return id(word_clock).remote_values.get_green() != id(green).state;"
-                - light.is_on: word_clock
-            then:
-              - number.set:
-                  id: green
-                  value: !lambda "return id(word_clock).remote_values.get_green();"
-        - if:
-            condition:
-              and:
-                - lambda: "return id(word_clock).remote_values.get_blue() != id(blue).state;"
-                - light.is_on: word_clock
-            then:
-              - number.set:
-                  id: blue
-                  value: !lambda "return id(word_clock).remote_values.get_blue();"
-        - if: 
-            condition:
-              and: 
-                - switch.is_off: automatic_brightness
-                - lambda: "return id(word_clock).remote_values.get_brightness() != id(brightness).state;"
-                - light.is_on: word_clock
-            then:
-              - number.set:
-                  id: brightness
-                  value: !lambda "return id(word_clock).remote_values.get_brightness();"
-
-    on_turn_on:
-      then:
-        - if:
-            condition:
-              - switch.is_off: automatic_brightness
-            then:
-              - light.control: 
-                  id: word_clock
-                  effect: Clock
-                  red: !lambda "return id(red).state;"
-                  green: !lambda "return id(green).state;"
-                  blue: !lambda "return id(blue).state;"
-                  brightness: !lambda "return id(brightness).state;"
-            else:
-              - light.control: 
-                  id: word_clock
-                  effect: Clock
-                  red: !lambda "return id(red).state;"
-                  green: !lambda "return id(green).state;"
-                  blue: !lambda "return id(blue).state;"
     effects:
       - addressable_lambda:
           name: "Clock"
@@ -586,7 +449,7 @@ light:
              * Below is the transition control of the clock to change to the next time (next 5 minute section).
              * The update_interval is 20ms, which would mean that it takes 50 iterations in total to fade to the next time over a 1 second period.
              * This fade is divided into fading-out the old time (25 steps) and fading-in the new time (25 steps).
-             * The transition slider specifies the number of seconds the total fade takes (id: transition).
+             * The 02. Transition setting specifies the number of seconds the total fade takes (id: transition).
              * The value of the transition is multiplied by 25 (steps) to create the fader.
              */
             auto trans = int(25*id(transition).state);

@@ -24,7 +24,8 @@ table once at boot, and the Clock effect reads it from RAM.
 Ruled out:
 
 - `globals: restore_value: true`: the ESP8266 flash-preferences pool is shared
-  by all components and holds about 96 bytes in total; the table is 444 bytes.
+  by all components and the Wi-Fi credentials and holds 512 bytes in total;
+  the table alone is 450 bytes.
   There are also open ESPHome issues about flash preferences being disturbed by
   OTA on ESP8266.
 - One compiled binary per customer (packages/substitutions): ESPHome's usual

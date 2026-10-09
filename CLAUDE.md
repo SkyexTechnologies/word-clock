@@ -58,12 +58,23 @@ works on macOS in VS Code with the ESPHome extension.
 - **Offline time:** Home Assistant time over the native API, plus SNTP (a bare
   local IP where there is no DNS).
 - **Per-device LED layout** lives in flash sector 250, separate from ESPHome
-  preferences in sector 251. The `globals` flash pool (~96 bytes) can't hold
-  it. Fresh devices need a one-time layout write.
+  preferences in sector 251. The shared ESPHome preferences pool (512 bytes,
+  used by every restored entity and the Wi-Fi credentials) can't hold it.
+  Fresh devices need a one-time layout write.
 
 ## Guardrails
 
 - Keep `board: esp01_1m` and the custom linker script in sync.
+- ESP8266 preferences are stored by position, in component setup order, with
+  the Wi-Fi credentials last. Adding, removing or resizing anything that
+  restores state (restore_value numbers/selects, switches, light
+  `restore_mode`, globals) shifts them: after that update the clock loses its
+  Wi-Fi credentials and settings and starts its setup hotspot. Check this
+  before every flash and warn up front. Hiding an entity (`internal: true`)
+  or renaming it doesn't shift positions (renaming resets only that value).
+- The light (setup priority 799) is set up before the layout component (600)
+  and Wi-Fi. Keep it off during setup (`RESTORE_AND_OFF`) and turn it on in
+  `on_boot`; turning it on earlier crashed the fallback hotspot.
 - OTA size limit: the image (~485 KB) can grow to roughly 590 KB with
   ESPHome's compressed native OTA, but only ~512 KB if an uncompressed `.bin`
   is uploaded (web server OTA). Check the image size when adding features.

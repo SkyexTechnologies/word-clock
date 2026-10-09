@@ -29,9 +29,11 @@ minute dots.
 - Time from Home Assistant or NTP (SNTP), shown in words to the nearest
   5 minutes, plus four minute dots (LEDs 117-120) for the minutes in between.
 - Weekday letter (Z M D W D V Z, LEDs 110-116).
-- Automatic brightness from the light sensor, or manual brightness.
+- Automatic brightness from the light sensor, or a fixed brightness set on the
+  light.
 - Smooth fade between times, adjustable from 0 to 10 seconds.
-- Settings are stored in flash and survive power loss (`restore_from_flash`).
+- Settings, colour and the set brightness are stored in flash and survive
+  power loss (`restore_from_flash`); after a power cut the clock turns on again.
 - WiFi setup through a captive portal or Improv over serial; local web server
   on port 80 (works without Home Assistant, including a colour picker); native
   API for Home Assistant.
@@ -42,7 +44,7 @@ minute dots.
 | --- | --- |
 | 01. Word Clock | The light itself: on/off, colour (colour picker in the web UI) and brightness |
 | 02. Transition | Fade time between times, 0-10 s |
-| 03. Automatic Brightness | On: follow the light sensor. Off: manual brightness |
+| 03. Automatic Brightness | On: follow the light sensor. Off: use the brightness set on the light |
 | 04. / 05. Minimum / Maximum Brightness | Range used by automatic brightness |
 | 06. Time Zone | Follow Home Assistant/build default, or select a region with its UTC offset |
 | 07. Indication: It is | Show or hide "HET IS" |
