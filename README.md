@@ -51,6 +51,8 @@ minute dots.
 | 08. Indication: Minutes | Show or hide the four minute dots |
 | 09. Indication: Week Days | Show or hide the weekday letter |
 | Restart Word Clock | Button. A factory reset is only possible with the physical button (hold 10-20 s), not over the network |
+| Firmware Update | Diagnostic: installed version and whether an update is available |
+| Check for Firmware Update / Install Firmware Update | Buttons for the downloaded updates (see [Updating the firmware](#updating-the-firmware)) |
 | Layout Provisioned | Diagnostic: on when a valid word layout is stored; off means no layout, and the clock runs its LED self-test (colour cycle) until it is provisioned |
 
 ## Getting started
@@ -176,13 +178,26 @@ layout needs different indices.
 - **Design decisions:** see [docs/design-notes.md](docs/design-notes.md) for
   the offline-time and per-device-layout design notes.
 
-## Updating via ESPHome Dashboard
+## Updating the firmware
 
-The config includes `dashboard_import`, so a clock that is discovered by an
-ESPHome Dashboard can be adopted straight from
+**Downloaded updates (no Home Assistant or ESPHome needed).** The clock checks a
+manifest (`update_manifest_url` in the substitutions) every 6 hours. The web page
+shows the result under *Firmware Update*; *Install Firmware Update* downloads the
+new firmware, checks its MD5 and installs it. Home Assistant shows the same
+update as a standard update entity. Updates are never installed automatically.
+Until firmware is published (issue #2), the URL is a placeholder and the status
+reads "update server not reachable". ESPHome cannot verify HTTPS certificates
+on the ESP8266 (`verify_ssl: false`); the MD5 in the manifest protects against
+corrupted downloads, not against a tampered server.
+
+The web page no longer accepts firmware uploads (`web_server: ota: false`), so
+nobody on the network can install their own firmware through it.
+
+**ESPHome Dashboard / Builder.** The config includes `dashboard_import`, so a
+clock that is discovered by an ESPHome Dashboard can be adopted straight from
 `github://SkyexTechnologies/word-clock/word-clock.yaml@main`. Keep
-`word-clock.yaml` at the repository root on the `main` branch, and bump
-`project_version` in the substitutions for every release.
+`word-clock.yaml` at the repository root on the `main` branch. See `CLAUDE.md`
+for the version numbering (`X.Y.Z-dev` between releases).
 
 ## Provisioning a word layout
 

@@ -3,6 +3,10 @@ substitutions:
   friendly_name: "Word Clock"
   project_name: "Skyex Technologies.Word Clock"
   project_version: "1.0.0-dev"
+  # Firmware update manifest (ESPHome manifest JSON with the OTA binary and
+  # its MD5). Placeholder until firmware is published (#2): the .invalid
+  # domain never resolves, so update checks fail harmlessly.
+  update_manifest_url: "https://updates.example.invalid/word-clock/manifest.json"
 
 esphome:
   name: "${name}"
@@ -68,6 +72,20 @@ api:
 
 ota:
   - platform: esphome
+  # Lets the clock download and install firmware itself (see update:).
+  - platform: http_request
+
+http_request:
+  # ESPHome cannot verify HTTPS certificates on the ESP8266; downloads are
+  # checked against the MD5 in the manifest instead.
+  verify_ssl: false
+
+update:
+  - platform: http_request
+    id: firmware_update
+    name: "Firmware"
+    source: ${update_manifest_url}
+    # Checks every 6 hours (default); installing is always a user action.
 
 wifi:
   fast_connect: False
@@ -83,6 +101,9 @@ web_server:
   # Version 3 has a colour picker for the light, so the colour can be set
   # without Home Assistant.
   version: 3
+  # No firmware upload through the web page: anyone on the network could
+  # install their own firmware. Updates come from update: (buttons below).
+  ota: false
 
 dashboard_import:
   package_import_url: github://SkyexTechnologies/word-clock/word-clock.yaml@main
@@ -110,6 +131,28 @@ time:
     id: sntp_time
 
 button:
+  # The web page has no install button for update entities, so these two
+  # buttons and the "Firmware Update" text sensor expose the update there.
+  - platform: template
+    name: "Check for Firmware Update"
+    icon: "mdi:refresh"
+    entity_category: config
+    on_press:
+      - update.check: firmware_update
+  - platform: template
+    name: "Install Firmware Update"
+    icon: "mdi:download"
+    entity_category: config
+    on_press:
+      - if:
+          condition:
+            lambda: return id(firmware_update)->state == update::UPDATE_STATE_AVAILABLE;
+          then:
+            - update.perform: firmware_update
+          else:
+            - logger.log:
+                level: WARN
+                format: "No firmware update available to install"
   # Internal: a factory reset needs physical access (hold the button
   # 10-20 s), so nobody on the network can wipe the clock.
   - platform: factory_reset
@@ -371,6 +414,25 @@ number:
       - script.execute: 
           id: set_light_brightness
           quick_transition: True
+text_sensor:
+  - platform: template
+    name: "Firmware Update"
+    icon: "mdi:update"
+    entity_category: diagnostic
+    update_interval: 30s
+    lambda: |-
+      auto *fw = id(firmware_update);
+      switch (fw->state) {
+        case update::UPDATE_STATE_AVAILABLE:
+          return std::string("${project_version} -> ") + fw->update_info.latest_version + " available";
+        case update::UPDATE_STATE_INSTALLING:
+          return std::string("Installing...");
+        case update::UPDATE_STATE_NO_UPDATE:
+          return std::string("${project_version} (up to date)");
+        default:
+          return std::string("${project_version} (update server not reachable)");
+      }
+
 sensor:
   - platform: adc
     pin: A0
