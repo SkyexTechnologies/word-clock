@@ -47,12 +47,13 @@ minute dots.
 | 03. Automatic Brightness | On: follow the light sensor. Off: use the brightness set on the light |
 | 04. / 05. Minimum / Maximum Brightness | Range used by automatic brightness |
 | 06. Time Zone | Follow Home Assistant/build default, or select a region with its UTC offset |
-| 07. Indication: It is | Show or hide "HET IS" |
-| 08. Indication: Minutes | Show or hide the four minute dots |
-| 09. Indication: Week Days | Show or hide the weekday letter |
+| Indication: It is | Show or hide "HET IS" (hidden if the clock has no "HET IS") |
+| Indication: Minutes | Show or hide the four minute dots (hidden if the clock has none) |
+| Indication: Week Days | Show or hide the weekday letter (hidden if the clock has none) |
 | Restart Word Clock | Button. A factory reset is only possible with the physical button (hold 10-20 s), not over the network |
 | Firmware Update | Diagnostic: installed version and whether an update is available |
 | Check for Firmware Update / Install Firmware Update | Buttons for the downloaded updates (see [Updating the firmware](#updating-the-firmware)) |
+| Hardware | Diagnostic: hardware revision and fitted indications from the factory data |
 | Layout Provisioned | Diagnostic: on when a valid word layout is stored; off means no layout, and the clock runs its LED self-test (colour cycle) until it is provisioned |
 
 ## Getting started
@@ -253,9 +254,27 @@ the same LAN, activate the project virtual environment, then run:
 python scripts/provision_layout.py <clock-ip-or-hostname>
 ```
 
-The default table is in `provisioning/default-layout.json`. The script validates
-37 rows of 12 LED indices and sends them over the encrypted/native ESPHome API
-when configured. A clock with an encryption key needs it: pass
+The default factory data is in `provisioning/default-layout.json`:
+
+```json
+{
+  "version": 1,
+  "hardware_revision": 1,
+  "indications": { "it_is": true, "minutes": true, "weekdays": true },
+  "words": [[0, 1, 2, 4, 5, -1, ...], ...]
+}
+```
+
+- `hardware_revision` (1-255) identifies the board, for example a changed
+  pinout. It is shown in the *Hardware* diagnostic and can be used by future
+  firmware.
+- `indications` says which extras this clock has. The switch of a missing
+  indication is hidden from the web page and Home Assistant, and the clock
+  never lights it. Visibility is decided at boot, so restart the clock after
+  writing new factory data.
+- `words` holds 37 rows of 12 LED indices (`-1` = unused).
+
+The script validates the file and sends it over the native ESPHome API. A clock with an encryption key needs it: pass
 `--noise-psk <key>` (the key Home Assistant set). At the factory, write the
 layout over USB instead (below), which needs no key. The device log reports whether EEPROM
 commit succeeded, and

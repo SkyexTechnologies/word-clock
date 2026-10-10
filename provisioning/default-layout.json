@@ -1,5 +1,11 @@
 {
   "version": 1,
+  "hardware_revision": 1,
+  "indications": {
+    "it_is": true,
+    "minutes": true,
+    "weekdays": true
+  },
   "words": [
     [0, 1, 2, 4, 5, -1, -1, -1, -1, -1, -1, -1],
     [99, 100, 101, -1, -1, -1, -1, -1, -1, -1, -1, -1],

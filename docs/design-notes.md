@@ -35,10 +35,15 @@ Ruled out:
 
 ### How it works
 
-- Storage format (450 bytes, `EEPROMClass(250)` with a 512-byte buffer):
-  `uint32 magic` ("WLK1"), `uint8 version`, `int8_t words[37][12]`,
-  `uint8 checksum`. Every value fits in `int8_t`, including the `-1` sentinel.
-- `setup()` reads the blob. If magic, version, checksum or any LED index is
+- Storage format, version 1 (456 bytes, `EEPROMClass(1018)` with a 512-byte
+  buffer): `uint32 magic` ("WLK1"), `uint8 version`, `uint8 hardware_revision`
+  (1-255), `uint8 features` (bit 0 "HET IS", bit 1 minute dots, bit 2 weekday
+  letters), `uint8 reserved`, `int8_t words[37][12]`, `uint32 crc` (CRC-32 as
+  computed by `zlib.crc32` over all preceding bytes). Every LED value fits in
+  `int8_t`, including the `-1` sentinel. Format 1 was redefined in October 2026
+  (before the first release) to add the device info and replace the 8-bit sum
+  with the CRC; changing it after release means bumping `CONFIG_VERSION`.
+- `setup()` reads the blob. If magic, version, CRC, the device info or any LED index is
   wrong (blank or corrupt unit), it logs an error and keeps the table at `-1`
   instead of lighting random LEDs. The Clock effect then runs an LED self-test
   on the raw LED indices (all LEDs cycling red, green, blue at full
@@ -49,7 +54,8 @@ Ruled out:
   loaded before the Clock effect starts.
 - Writing happens only at provisioning time, never during updates:
   - **Over the LAN:** the `set_word_layout` API service takes an `int[]`
-    (37 x 12, row-major) and calls `write_layout_flat()`, which validates and
+    (37 x 12, row-major), the hardware revision and three indication flags,
+    and calls `write_layout()`, which validates and
     commits it. `scripts/provision_layout.py` sends
     `provisioning/default-layout.json` (or another file) to it.
   - **Over USB serial:** `scripts/provision_layout_usb.py` builds the same blob

@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Write a word-clock LED layout to its reserved flash sector over USB serial."""
+"""Write a word-clock LED layout and device info to its reserved flash sector over USB serial."""
 
 import argparse
 import struct
 import subprocess
 import sys
 import tempfile
+import zlib
 from pathlib import Path
 
-from provision_layout import load_layout
+from provision_layout import DeviceLayout, load_layout
 
 NUM_WORDS = 37
 LEDS_PER_WORD = 12
@@ -16,27 +17,42 @@ FLASH_SECTOR_SIZE = 4096
 FLASH_OFFSET = 0x3FA000  # Physical offset for memory-mapped sector 1018 (0x405FA000).
 CONFIG_MAGIC = 0x574C4B31  # "WLK1"
 CONFIG_VERSION = 1
+# Indication bits, as FEATURE_* in components/wordclock_layout/wordclock_layout.h.
+FEATURE_IT_IS = 1 << 0
+FEATURE_MINUTES = 1 << 1
+FEATURE_WEEKDAYS = 1 << 2
+BLOB_SIZE = 456  # sizeof(LayoutBlob) in the firmware
 DEFAULT_LAYOUT = Path(__file__).resolve().parents[1] / "provisioning" / "default-layout.json"
 
 
-def build_sector_image(flat_layout: list[int]) -> bytes:
+def build_sector_image(layout: DeviceLayout) -> bytes:
     """Build one erased flash sector containing the firmware's LayoutBlob."""
     expected_entries = NUM_WORDS * LEDS_PER_WORD
-    if len(flat_layout) != expected_entries:
-        raise ValueError(f"Expected {expected_entries} layout entries, got {len(flat_layout)}")
-    if any(value < -1 or value >= 121 for value in flat_layout):
+    if len(layout.flat) != expected_entries:
+        raise ValueError(f"Expected {expected_entries} layout entries, got {len(layout.flat)}")
+    if any(value < -1 or value >= 121 for value in layout.flat):
         raise ValueError("LED indices must be -1 or in the range 0..120")
+    if not 1 <= layout.hardware_revision <= 255:
+        raise ValueError("hardware_revision must be in the range 1..255")
 
-    checksum = sum(value & 0xFF for value in flat_layout) & 0xFF
-    blob = struct.pack(
-        f"<IB{expected_entries}bB",
+    features = (
+        (FEATURE_IT_IS if layout.has_it_is else 0)
+        | (FEATURE_MINUTES if layout.has_minutes else 0)
+        | (FEATURE_WEEKDAYS if layout.has_weekdays else 0)
+    )
+    # magic, version, hardware_revision, features, reserved, words, then crc.
+    body = struct.pack(
+        f"<IBBBB{expected_entries}b",
         CONFIG_MAGIC,
         CONFIG_VERSION,
-        *flat_layout,
-        checksum,
+        layout.hardware_revision,
+        features,
+        0,
+        *layout.flat,
     )
-    if len(blob) > FLASH_SECTOR_SIZE:
-        raise ValueError("Layout blob does not fit in the reserved flash sector")
+    blob = body + struct.pack("<I", zlib.crc32(body))
+    if len(blob) != BLOB_SIZE:
+        raise ValueError(f"Layout blob is {len(blob)} bytes, expected {BLOB_SIZE}")
     return blob + b"\xFF" * (FLASH_SECTOR_SIZE - len(blob))
 
 
@@ -48,8 +64,8 @@ def main() -> None:
     parser.add_argument("--yes", action="store_true", help="Skip the confirmation prompt")
     args = parser.parse_args()
 
-    flat_layout = load_layout(args.layout)
-    image = build_sector_image(flat_layout)
+    layout = load_layout(args.layout)
+    image = build_sector_image(layout)
 
     print(
         f"Ready to write {len(image)} bytes to flash sector 1018 at 0x{FLASH_OFFSET:06X} "

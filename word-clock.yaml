@@ -18,22 +18,33 @@ esphome:
     name: "${project_name}"
     version: "${project_version}"
   on_boot:
-    priority: -10
-    then:
-      # Turn on with the Clock effect in one call: the effect is dropped while
-      # the light restores switched off, and turning on without it first shows
-      # all LEDs in the light's colour. With the effect active, the default
-      # transition only fades the brightness of what the effect draws.
-      - light.turn_on:
-          id: word_clock
-          effect: Clock
-      # Without a layout this sets full brightness for the colour test.
-      - script.execute:
-          id: set_light_brightness
-          quick_transition: true
-      - script.execute:
-          id: apply_timezone
-          timezone_index: !lambda return id(timezone).active_index().value_or(0);
+    # After the layout component (setup priority 600) has loaded the factory
+    # data, before Wi-Fi (250): hide the switches of indications this clock
+    # doesn't have. ESPHome only allows this once per boot, before Home
+    # Assistant and the web page list the entities.
+    - priority: 500
+      then:
+        - lambda: |-
+            using namespace esphome::wordclock_layout;
+            id(indication_it_is)->set_internal(!id(layout).has_feature(FEATURE_IT_IS));
+            id(indication_minutes)->set_internal(!id(layout).has_feature(FEATURE_MINUTES));
+            id(indication_week_days)->set_internal(!id(layout).has_feature(FEATURE_WEEKDAYS));
+    - priority: -10
+      then:
+        # Turn on with the Clock effect in one call: the effect is dropped while
+        # the light restores switched off, and turning on without it first shows
+        # all LEDs in the light's colour. With the effect active, the default
+        # transition only fades the brightness of what the effect draws.
+        - light.turn_on:
+            id: word_clock
+            effect: Clock
+        # Without a layout this sets full brightness for the colour test.
+        - script.execute:
+            id: set_light_brightness
+            quick_transition: true
+        - script.execute:
+            id: apply_timezone
+            timezone_index: !lambda return id(timezone).active_index().value_or(0);
 
 external_components:
   # Fetched from GitHub (not a local path) so configs adopted through
@@ -70,9 +81,14 @@ api:
     - service: set_word_layout
       variables:
         flat_layout: int[]
+        hardware_revision: int
+        has_it_is: bool
+        has_minutes: bool
+        has_weekdays: bool
       then:
         - lambda: |-
-            if (!id(layout).write_layout_flat(flat_layout)) {
+            if (!id(layout).write_layout(flat_layout, hardware_revision, has_it_is, has_minutes,
+                                         has_weekdays)) {
               ESP_LOGE("word_clock", "Failed to save word layout to EEPROM");
             }
 
@@ -246,19 +262,19 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     icon: "mdi:brightness-auto"
   - platform: template
-    name: "07. Indication: It is"
+    name: "Indication: It is"
     id: indication_it_is
     optimistic: True
     restore_mode: RESTORE_DEFAULT_ON
     icon: "mdi:file-word-box-outline"
   - platform: template
-    name: "08. Indication: Minutes"
+    name: "Indication: Minutes"
     id: indication_minutes
     optimistic: True
     restore_mode: RESTORE_DEFAULT_ON
     icon: "mdi:file-word-box-outline"
   - platform: template
-    name: "09. Indication: Week Days"
+    name: "Indication: Week Days"
     id: indication_week_days
     optimistic: True
     restore_mode: RESTORE_DEFAULT_ON
@@ -435,6 +451,23 @@ number:
           id: set_light_brightness
           quick_transition: True
 text_sensor:
+  # Factory data from the layout sector: hardware revision and fitted
+  # indications. Written with the layout (scripts/provision_layout*.py).
+  - platform: template
+    name: "Hardware"
+    icon: "mdi:chip"
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: |-
+      using namespace esphome::wordclock_layout;
+      if (!id(layout).is_provisioned())
+        return std::string("Not provisioned");
+      std::string fitted;
+      if (id(layout).has_feature(FEATURE_IT_IS)) fitted += "it is, ";
+      if (id(layout).has_feature(FEATURE_MINUTES)) fitted += "minutes, ";
+      if (id(layout).has_feature(FEATURE_WEEKDAYS)) fitted += "weekdays, ";
+      fitted = fitted.empty() ? std::string("none") : fitted.substr(0, fitted.size() - 2);
+      return "Revision " + std::to_string(id(layout).hardware_revision()) + " (indications: " + fitted + ")";
   - platform: template
     name: "Firmware Update"
     icon: "mdi:update"
@@ -592,9 +625,13 @@ light:
             if (PreviousTime[1] == CurrentTime[1]) {
               std::fill_n(letters, it.size(), Color::BLACK);
               for (int i = 0; i < 5; i++) { 
-                if (i == 0 && !id(indication_it_is).state) continue;
-                if (i == 3 && !id(indication_week_days).state) continue;
-                if (i == 4 && !id(indication_minutes).state) continue;
+                // Skip indications that are switched off or not fitted on this clock.
+                if (i == 0 && (!id(indication_it_is).state ||
+                               !id(layout).has_feature(wordclock_layout::FEATURE_IT_IS))) continue;
+                if (i == 3 && (!id(indication_week_days).state ||
+                               !id(layout).has_feature(wordclock_layout::FEATURE_WEEKDAYS))) continue;
+                if (i == 4 && (!id(indication_minutes).state ||
+                               !id(layout).has_feature(wordclock_layout::FEATURE_MINUTES))) continue;
                 for (int j = 0; j < 12; j++) {
                   int8_t led = id(layout).led_for(CurrentTime[i], j);
                   if (led >= 0) letters[led] = current_color;
