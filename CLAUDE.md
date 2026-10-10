@@ -56,6 +56,13 @@ works on macOS in VS Code with the ESPHome extension.
 - Timezone: no explicit `timezone:`, so Home Assistant supplies it; the
   `06. Time Zone` select can override it. Add zones only with verified
   daylight-saving rules.
+- Security: `api: encryption: {}` (Home Assistant sets a per-clock key) and a
+  `provisioning:` 15-minute setup window. Native OTA stays, without a password
+  (decided 2026-10-09); with a runtime key ESPHome only offers OTA encryption,
+  so unencrypted uploads remain possible on the LAN. Downloaded updates via
+  `update: http_request`. Once a clock has a key, `esphome logs` over the
+  network needs that key; use serial logs on the bench clock (decided
+  2026-10-10: no separate dev config).
 - Never commit `secrets.yaml`, `.esphome/`, `.venv/`.
 
 ## Decisions already made (do not relitigate without asking)

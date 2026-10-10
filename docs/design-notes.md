@@ -154,8 +154,6 @@ Plan:
   only; store its private half as the Actions secret `PUBLIC_REPO_DEPLOY_KEY`.
 - Point `external_components` and `dashboard_import` at
   `github://SkyexTechnologies/word-clock-firmware...@release`.
-- Add a `dev.yaml` that uses the local `components/` folder, so component
-  changes can be built and tested (locally and in CI) before publishing.
 - Optional extension: the same workflow attaches the compiled `.bin` to a
   GitHub Release or GitHub Pages for `ota: platform: http_request`.
 

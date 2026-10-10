@@ -60,6 +60,12 @@ logger:
     improv_serial: INFO
 
 api:
+  # Every clock ships without a key. Home Assistant sets a per-clock key when
+  # it adopts the clock; from then on only encrypted connections work, and
+  # the key also protects OTA updates (see ota:). Without Home Assistant the
+  # clock stays keyless. Only a factory reset (hold the button 10-20 s)
+  # removes the key.
+  encryption: {}
   services:
     - service: set_word_layout
       variables:
@@ -71,9 +77,23 @@ api:
             }
 
 ota:
+  # Native OTA (ESPHome Builder, `esphome run`), without a password (decided
+  # 2026-10-09). Once Home Assistant has set the clock's API key, encryption
+  # is offered, but ESPHome cannot require it for a key set at runtime, so
+  # unencrypted uploads stay possible on the local network.
   - platform: esphome
   # Lets the clock download and install firmware itself (see update:).
   - platform: http_request
+
+# A key can only be set within 15 minutes after power-on, so nobody on the
+# network can claim a clock later. When the window closes, the setup hotspot
+# also shuts down: unplug and replug the clock to set it up again.
+provisioning:
+  timeout: 15min
+  on_timeout:
+    - logger.log:
+        level: WARN
+        format: "Setup window closed; restart the clock to set it up again"
 
 http_request:
   # ESPHome cannot verify HTTPS certificates on the ESP8266; downloads are

@@ -178,6 +178,29 @@ layout needs different indices.
 - **Design decisions:** see [docs/design-notes.md](docs/design-notes.md) for
   the offline-time and per-device-layout design notes.
 
+## Security
+
+- **Per-clock encryption key.** Clocks ship without a key. When Home Assistant
+  adopts a clock, it sets a key for that clock; from then on the native API
+  (control, logs, the layout service) only accepts encrypted connections with
+  that key. Removing the clock from Home Assistant clears the key again, but
+  only within the setup window (restart the clock first if it has been on for
+  more than 15 minutes). A factory reset (hold the button 10-20 s) always
+  removes it, for example before a clock changes owner.
+- **Setup window.** A key can only be set within 15 minutes after power-on, so
+  nobody on the network can claim a clock later. The setup hotspot also closes
+  when the window ends; unplug and replug the clock to set it up again.
+- **Native OTA updates** (ESPHome Builder, `esphome run`, port 8266) have no
+  password. Once Home Assistant has set the clock's key, uploads can be
+  encrypted with it, but unencrypted uploads are still accepted: anyone on the
+  local network can install firmware this way. The setup hotspot's upload page
+  remains as a recovery route while the hotspot is active.
+- **No firmware uploads through the web page**, Wi-Fi passwords are kept out of
+  the logs, and a factory reset needs the physical button.
+- Clocks without Home Assistant stay keyless: anyone on their network can still
+  change settings through the web page or the API, but cannot install firmware
+  or claim the clock after the setup window.
+
 ## Updating the firmware
 
 **Downloaded updates (no Home Assistant or ESPHome needed).** The clock checks a
@@ -193,9 +216,10 @@ corrupted downloads, not against a tampered server.
 The web page no longer accepts firmware uploads (`web_server: ota: false`), so
 nobody on the network can install their own firmware through it.
 
-**ESPHome Dashboard / Builder.** The config includes `dashboard_import`, so a
-clock that is discovered by an ESPHome Dashboard can be adopted straight from
-`github://SkyexTechnologies/word-clock/word-clock.yaml@main`. Keep
+**ESPHome Dashboard / Builder (advanced).** The config includes
+`dashboard_import`, so a clock that is discovered by an ESPHome Dashboard can be
+adopted straight from `github://SkyexTechnologies/word-clock/word-clock.yaml@main`.
+Self-built firmware can be installed wirelessly through native OTA. Keep
 `word-clock.yaml` at the repository root on the `main` branch. See `CLAUDE.md`
 for the version numbering (`X.Y.Z-dev` between releases).
 
@@ -231,7 +255,10 @@ python scripts/provision_layout.py <clock-ip-or-hostname>
 
 The default table is in `provisioning/default-layout.json`. The script validates
 37 rows of 12 LED indices and sends them over the encrypted/native ESPHome API
-when configured. The device log reports whether EEPROM commit succeeded, and
+when configured. A clock with an encryption key needs it: pass
+`--noise-psk <key>` (the key Home Assistant set). At the factory, write the
+layout over USB instead (below), which needs no key. The device log reports whether EEPROM
+commit succeeded, and
 the `Layout Provisioned` diagnostic sensor turns on once it has. Keep
 the layout JSON with factory records; ordinary firmware updates must not call
 the provisioning service.
