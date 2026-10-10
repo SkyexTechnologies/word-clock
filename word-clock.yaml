@@ -463,10 +463,14 @@ light:
     on_state:
       then:
         - if:
+            # Use the requested state (remote_values): when the light is
+            # switched on from the web page or Home Assistant, it is still
+            # fading in, and light.is_on (current_values) reads off, so the
+            # effect was never set and all LEDs lit up.
             condition:
-              and:
-                - lambda: "return id(word_clock).get_effect_name() == \"None\";"
-                - light.is_on: word_clock
+              lambda: |-
+                return id(word_clock).remote_values.is_on() &&
+                       id(word_clock).get_effect_name() == "None";
             then:
               - delay: 10ms
               # Enforce the light effect to be at "Clock"
