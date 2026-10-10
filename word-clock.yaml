@@ -477,6 +477,19 @@ light:
               - light.control:
                   id: word_clock
                   effect: Clock
+        # Switch off at once instead of fading out over the default 10 s
+        # transition (switching on keeps it). on_turn_off only fires after
+        # the fade has finished, so react to the requested state here.
+        - if:
+            condition:
+              lambda: |-
+                return !id(word_clock).remote_values.is_on() &&
+                       id(word_clock).current_values.is_on();
+            then:
+              - delay: 10ms
+              - light.turn_off:
+                  id: word_clock
+                  transition_length: 0s
     effects:
       - addressable_lambda:
           name: "Clock"
